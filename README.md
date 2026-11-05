@@ -7,7 +7,11 @@ Prototype de démonstration de la plateforme de l'Unité d'Information Passagers
 ## Modules
 - Salle de veille : vols OUA et BOY, état des transmissions H-48, H-24, H-30 min et fermeture du vol (art. 7 et 8)
 - Vols et manifestes, fiche passager (annexes 1 et 2), aperçu dépersonnalisé (art. 19)
-- Réception et lecture de messages UN/EDIFACT PAXLST
+- Réception et lecture de messages UN/EDIFACT PAXLST (API) et PNRGOV (PNR), avec suppression des codes religion et santé à l'intégration (art. 11)
+- Analyse des liens entre voyageurs (même réservation, téléphone, carte, courriel) avec graphe, et historique des voyages
+- Dossiers d'enquête avec synthèse exportable
+- Profils (analyste, superviseur, délégué à la protection des données, administrateur) et double validation des transmissions
+- Statistiques d'activité et de qualité du ciblage
 - Règles de ciblage réglables, listes de surveillance, file d'alertes avec décision motivée
 - Interconnexions simulées : INTERPOL (documents volés ou perdus, notices), liste nationale, MIDAS, agence de l'immigration
 - Recherche encadrée (finalité et référence obligatoires)
@@ -15,4 +19,4 @@ Prototype de démonstration de la plateforme de l'Unité d'Information Passagers
 - Protection des données : filtre des données sensibles (art. 11), journal d'audit (art. 14)
 
 ## Utilisation
-Ouvrir `index.html` dans un navigateur, ou consulter la version publiée via GitHub Pages. Aucune installation, aucun serveur.
+Ouvrir `index.html` dans un navigateur, ou consulter la version publiée via GitHub Pages. Aucune installation, aucun serveur. Les décisions et dossiers sont gardés dans le navigateur du visiteur (bouton « Réinitialiser la démo » dans le bandeau).

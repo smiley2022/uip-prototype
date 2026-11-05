@@ -166,6 +166,27 @@ textarea.edi{font-family:var(--f-mono);font-size:.78rem;min-height:300px;width:1
 .flow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-family:var(--f-mono);font-size:.78rem;color:var(--muted)}
 .flow span{border:1px solid var(--line);border-radius:5px;padding:3px 8px;background:var(--surface);color:var(--ink)}
 pre.fiche{font-family:var(--f-mono);font-size:.78rem;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:12px;white-space:pre-wrap;margin:0;max-height:300px;overflow:auto}
+.demo select{width:auto;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:4px;padding:1px 4px;font-size:.8rem;margin-left:4px}
+.demo .dctl{display:inline-flex;gap:10px;align-items:center;flex-wrap:wrap;margin-left:8px}
+.demo button{background:transparent;border:1px solid currentColor;border-radius:4px;padding:0 6px;font-size:.76rem;color:inherit}
+.bars{display:grid;gap:8px}
+.bars .b{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,2fr) 3.2em;gap:10px;align-items:center;font-size:.85rem}
+.bars .b span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bars .tr{height:10px;background:var(--grey-soft);border-radius:5px;overflow:hidden}
+.bars .tr i{display:block;height:100%;background:var(--accent);border-radius:5px}
+.bars .b b{font-family:var(--f-mono);text-align:right}
+.seg-tg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.seg-tg button{border:0;background:transparent;padding:6px 12px;font-weight:600;font-size:.85rem}
+.seg-tg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.gwrap{overflow-x:auto}
+.graph{width:100%;min-width:500px;height:auto;display:block}
+.graph g[data-plink]{cursor:pointer}
+.graph g[data-plink]:hover circle,.graph g[data-plink]:focus circle{stroke:var(--accent);stroke-width:3}
+.lgd{display:flex;gap:14px;flex-wrap:wrap;font-size:.78rem;color:var(--muted)}
+.lgd i{display:inline-block;width:16px;height:3px;border-radius:2px;vertical-align:middle;margin-right:5px}
+.hist{display:grid;gap:0}
+.hist div{display:grid;grid-template-columns:6.5em minmax(0,1fr) auto;gap:10px;padding:6px 0;border-bottom:1px solid var(--line);font-size:.86rem}
+.hist div:last-child{border-bottom:0}
 @media (max-width:1100px){.k4{grid-template-columns:repeat(2,minmax(0,1fr))}.c2{grid-template-columns:minmax(0,1fr)}.h3{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:860px){
   .app{grid-template-columns:minmax(0,1fr)}
@@ -180,7 +201,8 @@ pre.fiche{font-family:var(--f-mono);font-size:.78rem;background:var(--surface);b
 @media (max-width:560px){.k4,.h2,.h3{grid-template-columns:minmax(0,1fr)}.policy{grid-template-columns:1fr}.policy div{border-right:0;border-bottom:1px solid var(--line)}.kpi .v{font-size:2rem}h1{font-size:1.5rem}}
 </style>
 
-<div class="demo" role="note">Prototype de démonstration : toutes les compagnies, personnes et listes affichées sont fictives. Aucune donnée réelle ne doit être saisie ici (art. 15 : hébergement sur infrastructures nationales).</div>
+<div class="demo" role="note">Prototype de démonstration : toutes les compagnies, personnes et listes affichées sont fictives. Aucune donnée réelle ne doit être saisie ici (art. 15).
+  <span class="dctl"><label>Profil <select id="role" aria-label="Profil de démonstration"><option value="Analyste">Analyste</option><option value="Superviseur">Superviseur</option><option value="DPD">Délégué à la protection des données</option><option value="Administrateur">Administrateur</option></select></label><button type="button" id="resetdemo">Réinitialiser la démo</button></span></div>
 <div class="app">
   <aside class="side">
     <div class="brand">
@@ -195,15 +217,17 @@ pre.fiche{font-family:var(--f-mono);font-size:.78rem;background:var(--surface);b
       <span class="navgrp">Analyse</span>
       <a href="#ciblage">Règles de ciblage</a>
       <a href="#listes">Listes de surveillance</a>
-      <a href="#reception">Réception PAXLST</a>
+      <a href="#dossiers">Dossiers d'enquête</a>
+      <a href="#reception">Réception API / PNR</a>
       <a href="#recherche">Recherche</a>
       <a href="#interconnexions">Interconnexions <span class="cnt" id="cnt-conn"></span></a>
       <span class="navgrp">Contrôle</span>
+      <a href="#statistiques">Statistiques</a>
       <a href="#transporteurs">Transporteurs</a>
       <a href="#protection">Protection des données</a>
       <a href="#apropos">Architecture</a>
     </nav>
-    <div class="who"><span class="clock" id="clock">--:--</span><span>Heure de Ouagadougou (GMT)</span><span style="margin-top:6px">Connecté : <b>Analyste de permanence</b></span><span>Cellule opérationnelle 24/7</span></div>
+    <div class="who"><span class="clock" id="clock">--:--</span><span>Heure de Ouagadougou (GMT)</span><span style="margin-top:6px">Profil : <b id="whorole">Analyste</b></span><span>Cellule opérationnelle 24/7</span></div>
   </aside>
   <main id="view"></main>
 </div>
@@ -311,10 +335,13 @@ function makePax(f, opts = {}){
       creation: f.std - ri(3, 60) * DAY, emission: 0, paiement: pick(["Carte bancaire","Carte bancaire","Virement agence","Espèces"]),
       allerSimple: rnd() < .22, agence: pick(AGENCES), arnk: rnd() < .04, modifs24h: rnd() < .06 ? ri(3,5) : ri(0,1),
       ssr: [pick(SSR_OK)].concat(rnd() < .12 ? [pick(Object.keys(SSR_EXCLUS))] : []), fqtv: rnd() < .2,
-      api: null }
+      api: null, tel: `+226 7${ri(0,9)} ${pad(ri(0,99))} ${pad(ri(0,99))} ${pad(ri(0,99))}`, carte: null, email: null }
   };
   p.pnr.emission = p.pnr.creation + ri(0, 2) * DAY;
+  if (p.pnr.paiement === "Carte bancaire") p.pnr.carte = "**** " + ri(1000, 9999);
+  if (rnd() < .7) p.pnr.email = `${norm(p.prenoms).split(" ")[0].toLowerCase()}.${norm(p.nom).replace(/ /g,"").toLowerCase()}${ri(1,99)}@courriel.test`;
   if (opts.pnr) Object.assign(p.pnr, opts.pnr);
+  if (p.pnr.paiement !== "Carte bancaire") p.pnr.carte = null;
   return p;
 }
 function genFlights(){
@@ -344,20 +371,25 @@ function genFlights(){
     const anyData = ["ddp1","ddp2","api","ferm"].some(k => f.win[k].st === "recu" || f.win[k].st === "retard");
     if (!anyData) return;
     const np = ri(26, 64), crew = ri(4, 7);
-    for (let i = 0; i < np; i++) f.pax.push(makePax(f));
+    for (let i = 0; i < np; i++){ const q = makePax(f), prev = f.pax[f.pax.length - 1];
+      if (prev && rnd() < .14) { ["loc","tel","carte","email","paiement","creation","emission","agence","allerSimple"].forEach(k => q.pnr[k] = prev.pnr[k]); if (rnd() < .6) q.nom = prev.nom; }
+      f.pax.push(q); }
     for (let i = 0; i < crew; i++) f.pax.push(makePax(f, {statut:"Équipage", nat: pick(["BFA","CIV","SEN","FRA","ETH"])}));
   });
   /* Cas d'école plantés dans les vols à venir ou récents (tous fictifs) */
   const withPax = FLIGHTS.filter(f => f.pax.length && f.std > NOW0 - 6*H);
   const plant = (k, opts) => { const f = withPax[k % withPax.length]; if (!f) return; const p = makePax(f, opts); f.pax.splice(ri(0, f.pax.length), 0, p); return p; };
-  plant(0, {nom:"VELTAMBO", prenoms:"Issaka", ddn:"1988-04-12", sexe:"M", nat:"BFA", pnr:{allerSimple:true, paiement:"Espèces", creation: withPax[0].std - 30*H}});
+  const vel = plant(0, {nom:"VELTAMBO", prenoms:"Issaka", ddn:"1988-04-12", sexe:"M", nat:"BFA", pnr:{allerSimple:true, paiement:"Espèces", creation: withPax[0].std - 30*H, tel:"+226 76 41 08 52", email:null}});
+  if (vel) { plant(0, {nom:"SANOU", prenoms:"Boukary", ddn:"1990-10-03", sexe:"M", nat:"BFA", pnr:{loc: vel.pnr.loc, allerSimple:true, paiement:"Espèces", creation: vel.pnr.creation, tel: vel.pnr.tel, email:"b.sanou77@courriel.test"}});
+    plant(9, {nom:"KONATE", prenoms:"Moussa", ddn:"1986-01-22", sexe:"M", nat:"MLI", pnr:{email:"b.sanou77@courriel.test", paiement:"Carte bancaire", carte:"**** 7310"}});
+    plant(10, {nom:"BAMBA", prenoms:"Awa", ddn:"1993-05-09", sexe:"F", nat:"CIV", pnr:{paiement:"Carte bancaire", carte:"**** 7310"}}); }
   plant(1, {nom:"NARGELE", prenoms:"Fatime", ddn:"1991-09-30", sexe:"F", nat:"MLI"});
   plant(2, {nom:"OUATTARA", prenoms:"Seydou", ddn:"1983-06-14", sexe:"M", nat:"BFA", doc:{type:"P", num:"B7731045", emet:"BFA", exp:"2029-02-11"}});
   plant(3, {nom:"DOMASI", prenoms:"Karim", ddn:"1980-03-09", sexe:"M", nat:"NER"});
   plant(4, {nom:"KABORE", prenoms:"Rokia", ddn:"1999-12-01", sexe:"F", nat:"BFA", doc:{type:"P", num:"C2210456", emet:"BFA", exp: iso(NOW0 - 40*DAY)}});
   const mm = plant(5, {nom:"TRAORE", prenoms:"Abdoul", ddn:"1990-05-17", sexe:"M", nat:"CIV", pnr:{allerSimple:true, paiement:"Espèces", arnk:true, modifs24h:4}});
   if (mm) mm.pnr.api = {nom:"TRAORE", prenoms:"Abdoulaye", ddn:"1990-07-15"};
-  plant(6, {nom:"ZALIBOU", prenoms:"Moctar", ddn:"1995-02-18", sexe:"M", nat:"NER", pnr:{creation: withPax[6 % withPax.length].std - 20*H, paiement:"Espèces", allerSimple:true}});
+  plant(6, {nom:"ZALIBOU", prenoms:"Moctar", ddn:"1995-02-18", sexe:"M", nat:"NER", pnr:{creation: withPax[6 % withPax.length].std - 20*H, paiement:"Espèces", allerSimple:true, tel:"+226 76 41 08 52"}});
   plant(7, {nom:"TIMBELA", prenoms:"Aïssata", ddn:"2011-03-04", sexe:"F", nat:"BFA", pnr:{agence:"Comptoir aéroport", paiement:"Espèces"}});
   FLIGHTS.forEach(f => f.pax.forEach(p => PAX[p.id] = p));
 }
@@ -382,8 +414,22 @@ const RULES = [
   {id:"R6", nom:"Aller simple réglé en espèces moins de 48 h avant le départ", poids:25, actif:true, base:"DDP"},
   {id:"R7", nom:"Rupture d'itinéraire (segment ARNK)", poids:15, actif:true, base:"DDP"},
   {id:"R8", nom:"Réservation modifiée 3 fois ou plus en 24 h", poids:10, actif:true, base:"DDP"},
-  {id:"R9", nom:"Concordance avec une notice ou diffusion INTERPOL", poids:90, actif:true, auto:true, base:"Notices INTERPOL (simulation)"}
+  {id:"R9", nom:"Concordance avec une notice ou diffusion INTERPOL", poids:90, actif:true, auto:true, base:"Notices INTERPOL (simulation)"},
+  {id:"R10", nom:"Lien avec une personne signalée (réservation, téléphone, carte ou courriel)", poids:50, actif:true, base:"Analyse des liens DDP"}
 ];
+/* Analyse des liens : index des réservations, téléphones, cartes et courriels */
+const LK = {loc:"même réservation", tel:"même téléphone", carte:"même carte", email:"même courriel"};
+const LK_COL = {loc:"var(--accent)", tel:"var(--amber)", carte:"var(--red)", email:"var(--blue)"};
+let LIDX = null;
+function buildIdx(){ LIDX = {}; Object.values(PAX).forEach(p => Object.keys(LK).forEach(k => { const v = p.pnr[k]; if (!v) return; const key = k + "|" + v; (LIDX[key] = LIDX[key] || []).push(p.id); })); }
+function links(p){ if (!LIDX) buildIdx(); const m = {};
+  Object.keys(LK).forEach(k => { const v = p.pnr[k]; if (!v) return; (LIDX[k + "|" + v] || []).forEach(id => { if (id !== p.id) (m[id] = m[id] || []).push(k); }); });
+  return Object.entries(m).map(([id, via]) => ({p: PAX[id], via})).filter(x => x.p); }
+const flagged = id => RES[id] && RES[id].hits.some(h => ["R1","R2","R9"].includes(h.id));
+function linkPass(list){ const r10 = RULES.find(r => r.id === "R10"); if (!r10.actif) return;
+  list.forEach(p => { const fl = links(p).filter(l => flagged(l.p.id)); if (!fl.length) return; const r = RES[p.id], l = fl[0];
+    r.hits.push({id:"R10", nom:r10.nom, poids:r10.poids, detail:`${l.via.map(k => LK[k]).join(", ")} que ${l.p.nom} ${l.p.prenoms} (${RES[l.p.id].hits.find(h => ["R1","R2","R9"].includes(h.id)).id})${fl.length > 1 ? ` et ${fl.length - 1} autre(s) personne(s) signalée(s)` : ""}`, ref:l.p.id, auto:false});
+    r.score = Math.min(100, r.score + r10.poids); r.alerte = r.score >= THRESHOLD || r.hits.some(h => h.auto); }); }
 let THRESHOLD = 50;
 function screen(p){
   const f = FLIGHTS.find(x => x.id === p.vol), hits = [];
@@ -410,7 +456,7 @@ function screen(p){
 }
 const RES = {};
 function screenAll(why){
-  const list = Object.values(PAX); list.forEach(p => RES[p.id] = screen(p));
+  const list = Object.values(PAX); buildIdx(); list.forEach(p => RES[p.id] = screen(p)); linkPass(list);
   if (why) CONNECTORS.filter(c => c.regles.length).forEach(c => { const hits = Object.values(RES).filter(r => r.hits.some(h => c.regles.includes(h.id))).length;
     CONN_LOG.unshift({at: Date.now(), c: c.id, req: c.etat === "ok" ? list.length : 0, hits, ms: c.etat === "ok" ? Math.round(c.lat * (0.8 + rnd() * 0.5)) : null, ok: c.etat === "ok", why}); });
 }
@@ -419,11 +465,16 @@ screenAll("Criblage initial des manifestes");
 /* =============== Alertes, audit, procédures =============== */
 const ALERT = {}; // paxId -> {statut, service, motif, at, hist:[]}
 const AUDIT = [];
-const audit = (action, objet) => AUDIT.unshift({at: Date.now(), qui: "Analyste de permanence", action, objet});
+let ROLE = "Analyste";
+const ROLE_LABEL = {Analyste:"Analyste de permanence", Superviseur:"Superviseur de quart", DPD:"Délégué à la protection des données", Administrateur:"Administrateur"};
+const canSup = () => ROLE === "Superviseur" || ROLE === "Administrateur";
+const audit = (action, objet) => AUDIT.unshift({at: Date.now(), qui: ROLE_LABEL[ROLE], action, objet});
 audit("Ouverture de session", "Poste cellule opérationnelle");
 const SERVICES = ["Police aux Frontières (DGPN)","Brigade de protection des mineurs (DGPN)","BCN INTERPOL Ouagadougou","Direction Générale des Douanes","DGSI","CNSE","Gendarmerie (EMGN)","Agence de l'immigration"];
 const alerts = () => Object.values(PAX).filter(p => RES[p.id] && RES[p.id].alerte).map(p => ({p, r: RES[p.id], f: FLIGHTS.find(x => x.id === p.vol), s: ALERT[p.id] || {statut:"nouvelle"}}));
-const openAlerts = () => alerts().filter(a => a.s.statut === "nouvelle" || a.s.statut === "en_examen");
+const isOpen = st => st === "nouvelle" || st === "en_examen" || st === "a_valider";
+const openAlerts = () => alerts().filter(a => isOpen(a.s.statut));
+const DOSS = [{id:"DOS-2026-001", titre:"Réseau de facilitation présumé (fictif)", statut:"En cours", ref:"Réquisition 2026/88 (fictive)", pax:[], notes:[], at: Date.now()}];
 const PROC = {}; // carrier -> {etape, lettre, montant, hist}
 const PROC_STEPS = ["Aucune procédure","Manquement notifié","Explication reçue","Délai de régularisation","Proposition d'amende transmise à l'ANAC"];
 const RECEIVED = [];
@@ -435,7 +486,7 @@ const carrierStats = () => CARRIERS.map(c => { const fl = FLIGHTS.filter(f => f.
 const scoreTag = s => `<span class="score ${s >= 90 ? "t-red" : s >= THRESHOLD ? "t-amber" : s > 0 ? "t-blue" : "t-grey"}">${s}</span>`;
 const winTags = f => `<span class="win">${WINDOWS.map(w => { const x = f.win[w.k]; return `<i class="w-${x.st}" title="${esc(w.l)} : ${esc(stLabel(x))}">${w.c}</i>`; }).join("")}</span>`;
 const stLabel = x => x.st === "recu" ? `reçu à ${hm(x.at)}` : x.st === "retard" ? `reçu avec ${x.ret} min de retard` : x.st === "manquant" ? "non reçu" : `attendu à ${hm(x.due)}`;
-const alertTag = s => ({nouvelle:'<span class="tag t-red">Nouvelle</span>', en_examen:'<span class="tag t-amber">En examen</span>', transmise:'<span class="tag t-blue">Transmise</span>', ecartee:'<span class="tag t-grey">Écartée</span>'})[s.statut];
+const alertTag = s => ({nouvelle:'<span class="tag t-red">Nouvelle</span>', en_examen:'<span class="tag t-amber">En examen</span>', a_valider:'<span class="tag t-amber">À valider</span>', transmise:'<span class="tag t-blue">Transmise</span>', ecartee:'<span class="tag t-grey">Écartée</span>'})[s.statut];
 const fLabel = f => `${f.num} · ${f.origine} → ${f.dest}`;
 const carName = code => (CARRIERS.find(c => c.code === code) || {nom: code}).nom;
 const cntAlert = () => { $("#cnt-alertes").textContent = openAlerts().length || ""; $("#cnt-conn").textContent = CONNECTORS.filter(c => c.etat !== "ok").length ? "!" : ""; };
@@ -490,10 +541,10 @@ vols(){
 },
 
 alertes(){
-  const list = alerts().filter(a => !UI.ast || a.s.statut === UI.ast || (UI.ast === "ouvertes" && (a.s.statut === "nouvelle" || a.s.statut === "en_examen"))).sort((a,b) => (fTime(a.f) - fTime(b.f)) || b.r.score - a.r.score);
+  const list = alerts().filter(a => !UI.ast || a.s.statut === UI.ast || (UI.ast === "ouvertes" && isOpen(a.s.statut))).sort((a,b) => (fTime(a.f) - fTime(b.f)) || b.r.score - a.r.score);
   return `
-  <div class="head"><div><span class="lbl">Cellule d'analyse des risques et de ciblage</span><h1>Alertes</h1><p>Une alerte n'est jamais transmise automatiquement : l'analyste vérifie, justifie et choisit le service destinataire. Chaque décision est tracée (art. 14).</p></div></div>
-  <div class="filters"><select id="f-ast" aria-label="Statut"><option value="ouvertes" ${UI.ast==="ouvertes"?"selected":""}>À traiter</option><option value="" ${!UI.ast?"selected":""}>Toutes</option><option value="transmise" ${UI.ast==="transmise"?"selected":""}>Transmises</option><option value="ecartee" ${UI.ast==="ecartee"?"selected":""}>Écartées</option></select></div>
+  <div class="head"><div><span class="lbl">Cellule d'analyse des risques et de ciblage</span><h1>Alertes</h1><p>Une alerte n'est jamais transmise automatiquement : l'analyste vérifie, justifie et propose un service destinataire ; un superviseur valide la transmission (double regard). Chaque décision est tracée (art. 14).</p></div></div>
+  <div class="filters"><select id="f-ast" aria-label="Statut"><option value="ouvertes" ${UI.ast==="ouvertes"?"selected":""}>À traiter</option><option value="" ${!UI.ast?"selected":""}>Toutes</option><option value="a_valider" ${UI.ast==="a_valider"?"selected":""}>À valider (double regard)</option><option value="transmise" ${UI.ast==="transmise"?"selected":""}>Transmises</option><option value="ecartee" ${UI.ast==="ecartee"?"selected":""}>Écartées</option></select></div>
   <div class="tw"><table class="t min"><thead><tr><th>Score</th><th>Voyageur</th><th>Vol</th><th>Motif principal</th><th>Statut</th><th></th></tr></thead><tbody>
   ${list.map(a => `<tr class="clk" data-pax="${a.p.id}"><td>${scoreTag(a.r.score)}</td><td><b>${esc(a.p.nom)} ${esc(a.p.prenoms)}</b><div class="note">${esc(a.p.statut)} · ${esc(a.p.nat)} · né(e) ${a.p.ddn.split("-").reverse().join("/")}</div></td><td>${esc(a.f.num)}<div class="note">${dShort(fTime(a.f))} ${hm(fTime(a.f))} · ${rel(fTime(a.f))}</div></td><td>${esc(a.r.hits[0].nom)}${a.r.hits.length > 1 ? ` <span class="note">+${a.r.hits.length - 1}</span>` : ""}</td><td>${alertTag(a.s)}${a.s.service ? `<div class="note">${esc(a.s.service)}</div>` : ""}</td><td><button class="btn sm" type="button">Examiner</button></td></tr>`).join("") || '<tr><td colspan="6" class="muted">Aucune alerte dans cette vue.</td></tr>'}
   </tbody></table></div>`;
@@ -505,20 +556,20 @@ ciblage(){
   <div class="head"><div><span class="lbl">Scénarios validés par la cellule juridique et le délégué à la protection des données</span><h1>Règles de ciblage</h1><p>Chaque passager est criblé à la réception. Le score additionne les poids des règles déclenchées. Les règles marquées « automatique » créent une alerte quel que soit le seuil.</p></div></div>
   <section class="grid h2">
     <div class="card"><header><h2>Seuil d'alerte</h2><span class="mono">${THRESHOLD} points</span></header>
-      <input id="thr" type="range" min="10" max="100" step="5" value="${THRESHOLD}" style="width:100%" aria-label="Seuil d'alerte">
+      <input id="thr" type="range" min="10" max="100" step="5" value="${THRESHOLD}" ${canSup() ? "" : "disabled"} style="width:100%" aria-label="Seuil d'alerte">
       <p class="note" style="margin:8px 0 0">Avec ce seuil : <b style="color:var(--ink)">${na}</b> alerte(s) sur ${n} voyageurs criblés (${(na/n*100).toFixed(1)} %).</p></div>
     <div class="card"><header><h2>Critères interdits</h2></header><p class="note" style="margin:0">Aucune règle ne peut porter sur l'origine raciale ou ethnique, les croyances religieuses ou philosophiques, l'appartenance politique ou syndicale, l'état matrimonial ou l'état de santé (art. 11). Ces données sont supprimées dès la réception. La nationalité seule n'est pas un critère de ciblage (art. 13 : pas de différenciation arbitraire).</p></div>
   </section>
   <div class="tw"><table class="t min"><thead><tr><th>Actif</th><th>Règle</th><th>Données</th><th>Poids</th><th>Déclenchements</th></tr></thead><tbody>
-  ${RULES.map(r => { const c = Object.values(RES).filter(x => x.hits.some(h => h.id === r.id)).length; return `<tr><td><label class="switch"><input type="checkbox" data-rule="${r.id}" ${r.actif?"checked":""} aria-label="Activer ${esc(r.nom)}"></label></td><td><b>${r.id}</b> · ${esc(r.nom)} ${r.auto ? '<span class="tag t-red">automatique</span>' : ""}</td><td class="note">${esc(r.base)}</td><td><input type="number" min="0" max="100" step="5" value="${r.poids}" data-poids="${r.id}" style="width:72px;background:var(--surface);border:1px solid var(--line);border-radius:5px;padding:4px 6px" aria-label="Poids ${r.id}"></td><td class="n">${c}</td></tr>`; }).join("")}
+  ${RULES.map(r => { const c = Object.values(RES).filter(x => x.hits.some(h => h.id === r.id)).length; return `<tr><td><label class="switch"><input type="checkbox" data-rule="${r.id}" ${r.actif?"checked":""} ${canSup() ? "" : "disabled"} aria-label="Activer ${esc(r.nom)}"></label></td><td><b>${r.id}</b> · ${esc(r.nom)} ${r.auto ? '<span class="tag t-red">automatique</span>' : ""}</td><td class="note">${esc(r.base)}</td><td><input type="number" min="0" max="100" step="5" value="${r.poids}" data-poids="${r.id}" ${canSup() ? "" : "disabled"} style="width:72px;background:var(--surface);border:1px solid var(--line);border-radius:5px;padding:4px 6px" aria-label="Poids ${r.id}"></td><td class="n">${c}</td></tr>`; }).join("")}
   </tbody></table></div>
-  <p class="note">Les changements s'appliquent immédiatement à tous les vols et sont inscrits au journal d'audit.</p>`;
+  <p class="note">${canSup() ? "Les changements s'appliquent immédiatement à tous les vols et sont inscrits au journal d'audit." : "Lecture seule : seuls les profils Superviseur et Administrateur modifient les règles. Changez de profil dans le bandeau pour essayer."}</p>`;
 },
 
 listes(){
   return `
   <div class="head"><div><span class="lbl">Sources de criblage</span><h1>Listes de surveillance</h1><p>Liste nationale alimentée par les services habilités, et base des documents de voyage signalés (en production : interrogation de la base INTERPOL des documents volés ou perdus).</p></div>
-    <div class="row"><button class="btn pri" type="button" id="addwatch">Ajouter une fiche</button></div></div>
+    <div class="row"><button class="btn pri" type="button" id="addwatch" ${canSup() ? "" : "disabled title=\"Réservé au superviseur\""}>Ajouter une fiche</button></div></div>
   <div class="card"><header><h2>Liste nationale <span class="note">(fiches fictives)</span></h2><span class="note">${WATCH.length} fiches</span></header>
     <div class="tw" style="border:0"><table class="t min"><thead><tr><th>Référence</th><th>Nom</th><th>Prénoms</th><th>Né(e) le</th><th>Consigne</th><th>Service source</th><th>Concordances</th></tr></thead><tbody>
     ${WATCH.map(w => { const c = Object.values(RES).filter(x => x.hits.some(h => h.ref === w.id)).length; return `<tr><td class="n">${esc(w.ref)}</td><td><b>${esc(w.nom)}</b></td><td>${esc(w.prenoms)}</td><td class="n">${w.ddn.split("-").reverse().join("/")}</td><td><span class="tag ${w.niveau==="Interpeller"?"t-red":w.niveau==="Signaler"?"t-amber":"t-blue"}">${esc(w.niveau)}</span></td><td>${esc(w.source)}</td><td class="n">${c}</td></tr>`; }).join("")}
@@ -531,15 +582,15 @@ listes(){
 
 reception(){
   return `
-  <div class="head"><div><span class="lbl">Format UN/EDIFACT PAXLST (D:05B)</span><h1>Réception PAXLST</h1><p>Collez un message RPCV tel que transmis par un transporteur. Le message est lu, contrôlé, filtré puis rattaché au vol et criblé.</p></div>
-    <div class="row"><button class="btn" type="button" id="sample">Charger un exemple</button></div></div>
+  <div class="head"><div><span class="lbl">Guichet unique · UN/EDIFACT</span><h1>Réception API / PNR</h1><p>${UI.fmt === "PNRGOV" ? "Collez un message PNRGOV (DDP, annexe 2). Les codes à caractère religieux ou médical sont supprimés à l'intégration (art. 11), puis les réservations sont rattachées aux voyageurs du vol, recoupées et criblées." : "Collez un message PAXLST (RPCV, annexe 1). Le message est lu, contrôlé, rattaché au vol et criblé."}</p></div>
+    <div class="row"><span class="seg-tg" role="group" aria-label="Format du message"><button type="button" data-fmt="PAXLST" aria-pressed="${UI.fmt !== "PNRGOV"}">PAXLST · API</button><button type="button" data-fmt="PNRGOV" aria-pressed="${UI.fmt === "PNRGOV"}">PNRGOV · PNR</button></span><button class="btn" type="button" id="sample">Charger un exemple</button></div></div>
   <section class="grid h2">
-    <div class="card" style="display:flex;flex-direction:column;gap:10px"><label class="field" for="edi">Message reçu<textarea class="edi" id="edi" spellcheck="false" placeholder="UNA:+.? '&#10;UNB+UNOA:4+…">${esc(UI.edi)}</textarea></label>
+    <div class="card" style="display:flex;flex-direction:column;gap:10px"><label class="field" for="edi">Message reçu<textarea class="edi" id="edi" spellcheck="false" placeholder="UNA:+.? '&#10;UNB+…">${esc(UI.edi)}</textarea></label>
       <div class="row"><button class="btn pri" type="button" id="parse">Lire le message</button><button class="btn" type="button" id="ingest" ${PARSED && PARSED.ok ? "" : "disabled"}>Intégrer et cribler</button></div></div>
     <div class="card" style="display:flex;flex-direction:column;gap:12px">${PARSED ? parsedView(PARSED) : '<p class="muted">Le résultat de la lecture apparaîtra ici : en-tête du vol, voyageurs, contrôles de cohérence et segments.</p>'}</div>
   </section>
   <div class="card"><header><h2>Messages intégrés pendant cette session</h2></header>
-    ${RECEIVED.length ? `<div class="tw" style="border:0"><table class="t"><thead><tr><th>Reçu à</th><th>Vol</th><th>Voyageurs</th><th>Alertes créées</th></tr></thead><tbody>${RECEIVED.map(m => `<tr class="clk" data-flight="${m.fid}"><td class="n">${hm(m.at)}</td><td>${esc(m.vol)}</td><td class="n">${m.n}</td><td class="n">${m.alertes}</td></tr>`).join("")}</tbody></table></div>` : '<p class="muted">Aucun message intégré pour l\'instant.</p>'}</div>`;
+    ${RECEIVED.length ? `<div class="tw" style="border:0"><table class="t"><thead><tr><th>Reçu à</th><th>Format</th><th>Vol</th><th>Voyageurs</th><th>Alertes créées</th></tr></thead><tbody>${RECEIVED.map(m => `<tr class="clk" data-flight="${m.fid}"><td class="n">${hm(m.at)}</td><td>${esc(m.kind || "PAXLST")}</td><td>${esc(m.vol)}</td><td class="n">${m.n}</td><td class="n">${m.alertes}</td></tr>`).join("")}</tbody></table></div>` : '<p class="muted">Aucun message intégré pour l\'instant.</p>'}</div>`;
 },
 
 transporteurs(){
@@ -618,16 +669,56 @@ recherche(){
   </tbody></table></div>` : ""}`;
 },
 
+dossiers(){
+  return `
+  <div class="head"><div><span class="lbl">Analyse et suivi</span><h1>Dossiers d'enquête</h1><p>Regroupez les voyageurs liés à une même affaire, consignez les recoupements et préparez une synthèse pour le service saisi. Chaque dossier porte la référence de la procédure qui justifie le traitement (art. 14).</p></div>
+    <div class="row"><button class="btn pri" type="button" id="newdoss" ${ROLE === "DPD" ? "disabled" : ""}>Nouveau dossier</button></div></div>
+  <div class="tw"><table class="t min"><thead><tr><th>Référence</th><th>Intitulé</th><th>Statut</th><th>Voyageurs</th><th>En alerte</th><th>Procédure</th><th>Mis à jour</th></tr></thead><tbody>
+  ${DOSS.map(d => `<tr class="clk" data-dopen="${d.id}"><td class="n">${esc(d.id)}</td><td><b>${esc(d.titre)}</b></td><td><span class="tag ${d.statut === "Clos" ? "t-grey" : d.statut === "Ouvert" ? "t-blue" : "t-amber"}">${esc(d.statut)}</span></td><td class="n">${d.pax.filter(x => PAX[x]).length}</td><td class="n">${d.pax.filter(x => RES[x] && RES[x].alerte).length}</td><td class="note">${esc(d.ref)}</td><td class="n">${dShort(d.at)} ${hm(d.at)}</td></tr>`).join("") || '<tr><td colspan="7" class="muted">Aucun dossier.</td></tr>'}
+  </tbody></table></div>
+  <p class="note">Depuis une fiche passager, « Ajouter avec ses liens » inscrit d'un coup le voyageur et les personnes qui partagent sa réservation, son téléphone, sa carte ou son courriel.</p>`;
+},
+
+statistiques(){
+  const al = alerts(), byS = {}; al.forEach(a => byS[a.s.statut] = (byS[a.s.statut] || 0) + 1);
+  const tr = byS.transmise || 0, ec = byS.ecartee || 0;
+  const bars = (rows, max, color) => `<div class="bars">${rows.map(([l, v]) => `<div class="b"><span title="${esc(l)}">${esc(l)}</span><div class="tr"><i style="width:${max ? Math.round(v / max * 100) : 0}%;${color ? `background:${typeof color === "function" ? color(v) : color}` : ""}"></i></div><b>${v}</b></div>`).join("")}</div>`;
+  const perRule = RULES.map(r => [`${r.id} · ${r.nom}`, al.filter(a => a.r.hits.some(h => h.id === r.id)).length]);
+  const st = [["Nouvelles","nouvelle"],["En examen","en_examen"],["À valider","a_valider"],["Transmises","transmise"],["Écartées","ecartee"]].map(([l, k]) => [l, byS[k] || 0]);
+  const svc = {}; al.filter(a => a.s.statut === "transmise").forEach(a => svc[a.s.service] = (svc[a.s.service] || 0) + 1);
+  const days = {}; FLIGHTS.forEach(f => { const k = iso(fTime(f)); days[k] = (days[k] || 0) + f.pax.filter(p => p.statut === "Passager").length; });
+  const cs = carrierStats(); const linkN = Object.values(RES).filter(r => r.hits.some(h => h.id === "R10")).length;
+  return `
+  <div class="head"><div><span class="lbl">Pilotage de l'unité</span><h1>Statistiques</h1><p>Indicateurs d'activité et de qualité du ciblage. Ils servent au rapport annuel et au contrôle du délégué à la protection des données.</p></div></div>
+  <section class="grid k4">
+    <div class="kpi"><span class="lbl">Voyageurs criblés</span><span class="v">${Object.keys(PAX).length}</span><span class="s">${FLIGHTS.length} vols suivis</span></div>
+    <div class="kpi alert"><span class="lbl">Alertes</span><span class="v">${al.length}</span><span class="s">${(al.length / Math.max(1, Object.keys(PAX).length) * 100).toFixed(1)} % des voyageurs</span></div>
+    <div class="kpi"><span class="lbl">Taux de faux positifs</span><span class="v">${tr + ec ? Math.round(ec / (tr + ec) * 100) : 0}<small> %</small></span><span class="s">${ec} écartée(s) sur ${tr + ec} alerte(s) tranchée(s)</span></div>
+    <div class="kpi"><span class="lbl">Alertes par analyse des liens</span><span class="v">${linkN}</span><span class="s">règle R10</span></div>
+  </section>
+  <section class="grid c2">
+    <div class="card"><header><h2>Alertes par règle</h2></header>${bars(perRule, Math.max(1, ...perRule.map(x => x[1])))}</div>
+    <div class="card"><header><h2>Traitement des alertes</h2></header>${bars(st, Math.max(1, ...st.map(x => x[1])), "var(--amber)")}
+      <h3 style="margin:16px 0 8px">Transmissions par service</h3>${Object.keys(svc).length ? bars(Object.entries(svc), Math.max(...Object.values(svc)), "var(--red)") : '<p class="muted" style="margin:0">Aucune transmission validée pour l\'instant.</p>'}</div>
+  </section>
+  <section class="grid c2">
+    <div class="card"><header><h2>Conformité des transporteurs</h2><span class="note">envois à l'heure</span></header>${bars(cs.map(s => [s.c.nom, s.taux]), 100, v => v >= 95 ? "var(--green)" : v >= 80 ? "var(--amber)" : "var(--red)")}</div>
+    <div class="card"><header><h2>Passagers par jour</h2></header>${bars(Object.entries(days).sort().map(([k, v]) => [new Date(k).toLocaleDateString("fr-FR", {weekday:"short", day:"2-digit", month:"short", timeZone:"UTC"}), v]), Math.max(1, ...Object.values(days)), "var(--blue)")}</div>
+  </section>`;
+},
+
 apropos(){
   return `
   <div class="head"><div><span class="lbl">Du prototype à la mise en production</span><h1>Architecture</h1><p>Ce prototype montre les écrans et la logique métier. Il ne reçoit aucune donnée réelle. Voici comment chaque module répond au projet de décret et ce qu'il faut pour l'exploiter.</p></div></div>
   <div class="tw"><table class="t min"><thead><tr><th>Module</th><th>Exigence</th><th>Prototype</th><th>Production</th></tr></thead><tbody>
-    <tr><td><b>Réception</b></td><td>Push via guichet unique, PAXLST et PNRGOV (art. 9)</td><td>Lecture PAXLST collé à la main</td><td>Connexion des transporteurs par messagerie sécurisée (réseau de télécommunication aéronautique), lecteur PNRGOV, accusés de réception</td></tr>
+    <tr><td><b>Réception</b></td><td>Push via guichet unique, PAXLST et PNRGOV (art. 9)</td><td>Lecture PAXLST et PNRGOV collés à la main, rattachement au vol</td><td>Connexion des transporteurs par messagerie sécurisée (réseau de télécommunication aéronautique), lecteur PNRGOV, accusés de réception</td></tr>
     <tr><td><b>Délais</b></td><td>H-48, H-24, H-30 min, fermeture (art. 7 et 8)</td><td>Contrôle par vol et par transporteur</td><td>Horaires de vols réels (programme saisonnier), relances automatiques</td></tr>
     <tr><td><b>Filtre</b></td><td>Exclusion des données sensibles (art. 11)</td><td>Suppression des codes SSR religion et santé</td><td>Filtre étendu aux textes libres (OSI, remarques), validé par la CIL</td></tr>
-    <tr><td><b>Criblage</b></td><td>Comparaison aux bases INTERPOL et listes nationales (art. 10)</td><td>8 règles, liste et base de documents simulées</td><td>Accès INTERPOL via le BCN, listes des services membres de l'UIP, MIDAS / PISCES</td></tr>
+    <tr><td><b>Criblage</b></td><td>Comparaison aux bases INTERPOL et listes nationales (art. 10)</td><td>10 règles dont l'analyse des liens (réservation, téléphone, carte, courriel)</td><td>Accès INTERPOL via le BCN, listes des services membres de l'UIP, MIDAS / PISCES</td></tr>
     <tr><td><b>Alertes</b></td><td>Transmission aux autorités compétentes</td><td>Décision motivée, choix du service</td><td>Diffusion sécurisée aux postes PAF et douane d'OUA et BOY, permanence 24/7</td></tr>
     <tr><td><b>Conservation</b></td><td>5 ans, dépersonnalisation à 6 mois (art. 19)</td><td>Politique affichée, aperçu dépersonnalisé</td><td>Tâches planifiées de masquage et de purge, réidentification sous contrôle du DPD</td></tr>
+    <tr><td><b>Habilitations</b></td><td>Accès limité aux agents habilités, contrôle du DPD (art. 12 et 14)</td><td>4 profils simulés, double regard sur chaque transmission</td><td>Comptes nominatifs, authentification forte, annuaire de l'État, revue périodique des droits</td></tr>
+    <tr><td><b>Dossiers</b></td><td>Traitement au cas par cas, finalités du décret</td><td>Dossiers d'enquête, liens, synthèse</td><td>Gestion documentaire sécurisée, lien avec les procédures judiciaires</td></tr>
     <tr><td><b>Traçabilité</b></td><td>Journaux sécurisés (art. 14)</td><td>Journal de session</td><td>Journal infalsifiable, comptes nominatifs, authentification forte</td></tr>
     <tr><td><b>Hébergement</b></td><td>Infrastructures nationales (art. 15)</td><td>Page de démonstration</td><td>Centre de données national, homologation ANSSI</td></tr>
     <tr><td><b>Sanctions</b></td><td>Procédure et amendes par l'ANAC (art. 21 et 22)</td><td>Suivi du dossier par transporteur</td><td>Lien avec l'arrêté interministériel de recouvrement</td></tr>
@@ -690,8 +781,80 @@ function parsePaxlst(txt){
   out.ok = !out.errors.length;
   return out;
 }
+/* =============== Lecture PNRGOV =============== */
+const MON = {JAN:"01",FEB:"02",MAR:"03",APR:"04",MAY:"05",JUN:"06",JUL:"07",AUG:"08",SEP:"09",OCT:"10",NOV:"11",DEC:"12"};
+function tokenize(txt){
+  let s = String(txt || "").replace(/\r/g, "").trim(); let comp = ":", el = "+", rel = "?", term = "'";
+  if (s.startsWith("UNA")) { comp = s[3]; el = s[4]; rel = s[6]; term = s[8]; s = s.slice(9); }
+  const segs = []; let cur = "";
+  for (let i = 0; i < s.length; i++) { const ch = s[i]; if (ch === rel && i + 1 < s.length) { cur += ch + s[++i]; continue; } if (ch === term) { if (cur.trim()) segs.push(cur.replace(/^\s+/, "")); cur = ""; } else cur += ch; }
+  if (cur.trim()) segs.push(cur.trim());
+  const split = (str, d) => { const r = []; let c = ""; for (let i = 0; i < str.length; i++) { if (str[i] === rel && i + 1 < str.length) { c += str[++i]; continue; } if (str[i] === d) { r.push(c); c = ""; } else c += str[i]; } r.push(c); return r; };
+  return {segs, parse: raw => split(raw, el).map(x => split(x, comp))};
+}
+function parsePnrgov(txt){
+  const out = {ok:false, kind:"PNRGOV", errors:[], warnings:[], segs:[], vol:null, pax:[], pnrs:0, exclus:0};
+  if (!String(txt || "").trim()) { out.errors.push("Le message est vide."); return out; }
+  const {segs, parse} = tokenize(txt); out.segs = segs;
+  const d6 = v => { const m = /^(\d{2})(\d{2})(\d{2})/.exec(v || ""); return m ? {d:+m[1], mo:+m[2], y:2000 + +m[3]} : null; };
+  const docDate = (v, birth) => { const m = /^(\d{2})([A-Z]{3})(\d{2})$/.exec(v || ""); if (!m || !MON[m[2]]) return null; let y = +m[3]; const cy = new Date().getUTCFullYear() % 100; y = birth ? (y > cy ? 1900 + y : 2000 + y) : 2000 + y; return `${y}-${MON[m[2]]}-${m[1]}`; };
+  const vol = {}; let rec = null, last = null; const recs = [];
+  segs.forEach(raw => { const e = parse(raw), tag = (e[0][0] || "").trim();
+    switch (tag) {
+      case "TVL": { const dt = d6(e[1] && e[1][0]), tm = (e[1] && e[1][1]) || "0000";
+        const seg = {std: dt ? Date.UTC(dt.y, dt.mo - 1, dt.d, +tm.slice(0,2), +tm.slice(2,4)) : null, dep: e[2] && e[2][0], arr: e[3] && e[3][0], car: e[4] && e[4][0], num: e[5] && e[5][0]};
+        if (!rec) { vol.num = `${seg.car} ${seg.num}`; vol.carrier = seg.car; vol.origine = seg.dep; vol.dest = seg.arr; vol.std = seg.std; } else rec.tvl.push(seg); break; }
+      case "SRC": rec = {loc:"", creation:null, tif:[], tvl:[], ssr:[], tel:null, email:null, carte:null, paiement:null, agence:null}; recs.push(rec); last = null; break;
+      case "RCI": if (rec) rec.loc = (e[1] && e[1][1]) || ""; break;
+      case "DAT": if (rec && e[1] && e[1][0] === "700") { const dt = d6(e[1][1]), tm = e[1][2] || "0000"; if (dt) rec.creation = Date.UTC(dt.y, dt.mo - 1, dt.d, +tm.slice(0,2), +tm.slice(2,4)); } break;
+      case "ORG": if (rec && e[1]) rec.agence = (e[1][1] ? "Point de vente " + e[1][1] : null); break;
+      case "TIF": if (rec) { last = {nom: (e[1] && e[1][0] || "").trim(), prenoms: ((e[2] && e[2][0]) || "").replace(/\s(MR|MRS|MS|MSTR|MISS)$/,"").trim(), doc:{}, ssr:[], sexe:"", nat:"", ddn:null}; rec.tif.push(last); } break;
+      case "SSR": if (rec) { const code = (e[1] && e[1][0] || "").trim();
+        if (code === "DOCS") { const f = raw.slice(raw.indexOf("/") + 1).split("/"); const who = last || rec.tif[rec.tif.length - 1];
+          if (who) { who.doc = {type: f[0] || "P", emet: f[1], num: f[2], exp: docDate(f[6])}; who.nat = f[3] || ""; who.ddn = docDate(f[4], true); who.sexe = (f[5] || "").charAt(0); } }
+        else (last || rec).ssr.push(code); } break;
+      case "IFT": if (rec && e[1]) { const q = e[1][1], v = (e[2] && e[2][0] || "").trim(); if (q === "CTCM" || q === "CTCH") rec.tel = "+" + v.replace(/^\+/, ""); else if (q === "CTCE") rec.email = v.replace("//", "@").toLowerCase(); } break;
+      case "FOP": if (rec && e[1]) { const t = e[1][0]; if (t === "CA") rec.paiement = "Espèces"; else if (t === "CC") { rec.paiement = "Carte bancaire"; const n = (e[1][4] || "").replace(/\D/g, ""); rec.carte = n ? "**** " + n.slice(-4) : null; } else rec.paiement = "Virement agence"; } break;
+    } });
+  out.vol = vol; out.pnrs = recs.length;
+  recs.forEach(r => r.tif.forEach(x => { const ssr = r.ssr.concat(x.ssr); out.exclus += ssr.filter(c => SSR_EXCLUS[c]).length;
+    out.pax.push({nom: x.nom, prenoms: x.prenoms, sexe: x.sexe, ddn: x.ddn, nat: x.nat, doc: x.doc, statut: "Passager",
+      pnr: {loc: r.loc, creation: r.creation, emission: r.creation, tel: r.tel, email: r.email, carte: r.carte, paiement: r.paiement || "Non renseigné", agence: r.agence || "Non renseigné", allerSimple: r.tvl.length <= 1, arnk: r.tvl.some(t => t.dep === "ARNK" || t.arr === "ARNK"), ssr: ["DOCS"].concat(ssr)}}); }));
+  if (!segs.some(x => /^UNH\+[^+]*\+PNRGOV/.test(x))) out.errors.push("En-tête UNH absent ou ne déclarant pas un message PNRGOV.");
+  if (!vol.num) out.errors.push("Segment TVL de vol absent : numéro de vol introuvable.");
+  if (vol.origine && vol.dest && !["OUA","BOY"].includes(vol.origine) && !["OUA","BOY"].includes(vol.dest)) out.errors.push(`Vol ${vol.origine} → ${vol.dest} : ni le départ ni l'arrivée ne se situent au Burkina Faso.`);
+  if (!recs.length) out.errors.push("Aucune réservation (SRC) dans le message.");
+  recs.forEach(r => { if (!r.loc) out.warnings.push("Une réservation n'a pas de code PNR (RCI)."); if (!r.tif.length) out.warnings.push(`Réservation ${r.loc} : aucun voyageur (TIF).`); });
+  out.pax.forEach(x => { if (!x.doc.num) out.warnings.push(`${x.nom} ${x.prenoms} : pas de document déclaré (SSR DOCS), rapprochement par le nom seulement.`); });
+  out.ok = !out.errors.length; return out;
+}
+function samplePnrgov(){
+  const f = FLIGHTS.filter(x => x.sens === "Arrivée" && x.std > Date.now() + 3*H)[1] || FLIGHTS[FLIGHTS.length - 2];
+  const d6 = t => { const d = new Date(t); return `${pad(d.getUTCDate())}${pad(d.getUTCMonth()+1)}${String(d.getUTCFullYear()).slice(2)}`; };
+  const tm = t => hm(t).replace(":", ""); const [car, num] = f.num.split(" "); const now = Date.now();
+  const vel = Object.values(PAX).find(p => p.nom === "VELTAMBO"); const tel = vel ? vel.pnr.tel.replace(/^\+/, "") : "226 76 41 08 52";
+  const ret = f.sta + 9*DAY;
+  const L = ["UNA:+.? '", `UNB+IATA:1+${car}+BFAUIP+${d6(now)}:${tm(now)}+${ri(10000,99999)}'`, `UNH+1+PNRGOV:11:1:IA+${car}${num}/${d6(f.std)}/${tm(f.std)}'`, "MSG+:22'", `ORG+${car}:${f.origine}'`,
+    `TVL+${d6(f.std)}:${tm(f.std)}+${f.origine}+${f.dest}+${car}+${num}'`, "EQN+3'",
+    "SRC'", "RCI+ZQ:R7KQ2M'", `DAT+700:${d6(f.std - 22*H)}:${tm(f.std - 22*H)}'`, `ORG+${car}:${f.origine}'`, "TIF+ROSSAMBA:I+YACOUBA MR:A:1'", "SSR+DOCS:HK::ZQ:::::/P/BFA/B5521907/BFA/27AUG83/M/02JUN30/ROSSAMBA/YACOUBA'",
+    `IFT+4:CTCM+${tel}'`, "FOP+CA:3'", `TVL+${d6(f.std)}:${tm(f.std)}+${f.origine}+${f.dest}+${car}+${num}'`,
+    "SRC'", "RCI+ZQ:W3HV8P'", `DAT+700:${d6(f.std - 34*DAY)}:0912'`, "ORG+ZQ:OUA'", "TIF+OUEDRAOGO:I+MARIAM MRS:A:1'", "SSR+DOCS:HK::ZQ:::::/P/BFA/A6630188/BFA/14FEB86/F/30SEP31/OUEDRAOGO/MARIAM'", "SSR+MOML'",
+    "TIF+OUEDRAOGO:I+IBRAHIM MSTR:C:2'", "SSR+DOCS:HK::ZQ:::::/P/BFA/A6630189/BFA/03JUL15/M/30SEP31/OUEDRAOGO/IBRAHIM'", "SSR+WCHR'",
+    "IFT+4:CTCM+226 70 55 12 90'", "IFT+4:CTCE+M.OUEDRAOGO//COURRIEL.TEST'", "FOP+CC:3::VI:XXXXXXXXXXXX4417'",
+    `TVL+${d6(f.std)}:${tm(f.std)}+${f.origine}+${f.dest}+${car}+${num}'`, `TVL+${d6(ret)}:${tm(ret)}+${f.dest}+${f.origine}+${car}+${num}'`,
+    "SRC'", "RCI+ZQ:J4NC6T'", `DAT+700:${d6(f.std - 12*DAY)}:1530'`, "TIF+YAMEOGO:I+PIERRE MR:A:1'", "SSR+DOCS:HK::ZQ:::::/P/BFA/B1187420/BFA/09NOV71/M/18JAN29/YAMEOGO/PIERRE'",
+    "IFT+4:CTCM+226 71 09 44 37'", "FOP+MS:3'", `TVL+${d6(f.std)}:${tm(f.std)}+${f.origine}+${f.dest}+${car}+${num}'`, `TVL+${d6(ret)}:${tm(ret)}+${f.dest}+${f.origine}+${car}+${num}'`];
+  L.push(`UNT+${L.length - 1}+1'`, `UNZ+1+${ri(10000,99999)}'`);
+  return L.join("\n");
+}
 function parsedView(r){
   const v = r.vol || {};
+  if (r.kind === "PNRGOV") return `<div class="row" style="justify-content:space-between"><h2>${esc(v.num || "Vol inconnu")} ${v.origine ? `· ${esc(v.origine)} → ${esc(v.dest)}` : ""}</h2>${r.ok ? '<span class="tag t-green">Message valide</span>' : '<span class="tag t-red">Message rejeté</span>'}</div>
+    <p class="note" style="margin:0">${v.std ? `Départ ${dmy(v.std)} ${hm(v.std)} UTC · ` : ""}${r.segs.length} segments · ${r.pnrs} réservation(s) · ${r.pax.length} voyageur(s)</p>
+    ${r.exclus ? `<div class="msg m-amber">${r.exclus} code(s) SSR relevant de l'art. 11 (religion, santé) détecté(s) : ils seront supprimés à l'intégration, avant tout stockage. Ils ne sont pas affichés.</div>` : ""}
+    ${r.errors.map(e => `<div class="msg m-red">${esc(e)}</div>`).join("")}${r.warnings.map(e => `<div class="msg m-amber">${esc(e)}</div>`).join("")}
+    ${r.pax.length ? `<div class="tw"><table class="t"><thead><tr><th>PNR</th><th>Nom</th><th>Naissance</th><th>Document</th><th>Paiement</th><th>Contact</th><th>Trajet</th></tr></thead><tbody>${r.pax.map(x => `<tr><td class="n">${esc(x.pnr.loc)}</td><td><b>${esc(x.nom)}</b> ${esc(x.prenoms)}</td><td class="n">${x.ddn ? x.ddn.split("-").reverse().join("/") : "—"}</td><td class="n">${esc(x.doc.num || "—")}</td><td>${esc(x.pnr.paiement)}${x.pnr.carte ? ` <span class="note">${esc(x.pnr.carte)}</span>` : ""}</td><td class="n">${esc(x.pnr.tel || "—")}${x.pnr.email ? `<div class="note">${esc(x.pnr.email)}</div>` : ""}</td><td>${x.pnr.allerSimple ? "Aller simple" : "Aller-retour"}</td></tr>`).join("")}</tbody></table></div>` : ""}
+    <details><summary class="note" style="cursor:pointer">Voir les segments EDIFACT</summary><div class="seg" style="margin-top:8px">${r.segs.map(x => /^SSR\+(MOML|KSML|HNML|MEDA|WCHR|BLND|DEAF|DPNA)/.test(x) ? "<b>SSR</b> [code masqué, art. 11]" : `<b>${esc(x.slice(0,3))}</b>${esc(x.slice(3))}`).join("\n")}</div></details>`;
   return `<div class="row" style="justify-content:space-between"><h2>${esc(v.num || "Vol inconnu")} ${v.origine ? `· ${esc(v.origine)} → ${esc(v.dest)}` : ""}</h2>${r.ok ? '<span class="tag t-green">Message valide</span>' : '<span class="tag t-red">Message rejeté</span>'}</div>
     ${v.std ? `<p class="note" style="margin:0">Départ ${dmy(v.std)} ${hm(v.std)} UTC${v.sta ? ` · arrivée ${hm(v.sta)}` : ""} · ${r.segs.length} segments · ${r.pax.length} voyageur(s)</p>` : ""}
     ${r.errors.map(e => `<div class="msg m-red">${esc(e)}</div>`).join("")}${r.warnings.map(e => `<div class="msg m-amber">${esc(e)}</div>`).join("")}
@@ -721,24 +884,26 @@ function samplePaxlst(){
   return L.join("\n");
 }
 function ingest(r){
-  const v = r.vol; let f = FLIGHTS.find(x => x.num.replace(/\s/g,"") === v.num.replace(/\s/g,"") && (!v.std || Math.abs(x.std - v.std) < 12*H));
+  const v = r.vol, pn = r.kind === "PNRGOV"; let f = FLIGHTS.find(x => x.num.replace(/\s/g,"") === v.num.replace(/\s/g,"") && (!v.std || Math.abs(x.std - v.std) < 12*H));
   if (!f) { const local = ["OUA","BOY"].includes(v.dest) ? v.dest : v.origine;
-    f = {id: "F" + (FLIGHTS.length + 1) + "x", num: v.num, carrier: v.carrier, sens: ["OUA","BOY"].includes(v.dest) ? "Arrivée" : "Départ", origine: v.origine, dest: v.dest, std: v.std || Date.now() + 2*H, sta: v.sta || (v.std || Date.now()) + 4*H, local, win:{}, pax:[], source:"Message PAXLST"};
+    f = {id: "F" + (FLIGHTS.length + 1) + "x", num: v.num, carrier: v.carrier, sens: ["OUA","BOY"].includes(v.dest) ? "Arrivée" : "Départ", origine: v.origine, dest: v.dest, std: v.std || Date.now() + 2*H, sta: v.sta || (v.std || Date.now()) + 4*H, local, win:{}, pax:[], source: pn ? "Message PNRGOV" : "Message PAXLST"};
     WINDOWS.forEach(w => { const due = f.std + w.off; f.win[w.k] = due > Date.now() ? {st:"a_venir", due} : {st:"manquant", due}; });
     if (!CARRIERS.some(c => c.code === v.carrier)) CARRIERS.push({code: v.carrier, nom: "Transporteur " + v.carrier, p: 1});
     FLIGHTS.push(f); FLIGHTS.sort((a,b) => fTime(a) - fTime(b)); }
-  const due = f.std + WINDOWS[2].off, now = Date.now();
-  f.win.api = now <= due + 5*MIN ? {st:"recu", due, at: now} : {st:"retard", due, at: now, ret: Math.round((now - due)/MIN)};
-  let created = 0;
+  const now = Date.now(), wk = pn ? (now < f.std - 24*H ? "ddp1" : now < f.std ? "ddp2" : "ferm") : "api", due = f.std + WINDOWS.find(w => w.k === wk).off;
+  f.win[wk] = now <= due + 5*MIN ? {st:"recu", due, at: now} : {st:"retard", due, at: now, ret: Math.round((now - due)/MIN)};
+  let created = 0; const before = new Set(Object.values(PAX).filter(p => RES[p.id] && RES[p.id].alerte).map(p => p.id));
   r.pax.forEach(x => {
-    const ex = f.pax.find(p => norm(p.nom) === norm(x.nom) && p.ddn === x.ddn);
+    const ex = f.pax.find(p => norm(p.nom) === norm(x.nom) && (p.ddn === x.ddn || (!x.ddn && norm(p.prenoms) === norm(x.prenoms))));
     const p = ex || makePax(f, {nom: x.nom, prenoms: x.prenoms.charAt(0) + x.prenoms.slice(1).toLowerCase(), sexe: x.sexe, ddn: x.ddn || "1900-01-01", nat: x.nat, statut: x.statut,
       doc: {type: x.doc.type || "P", num: x.doc.num || "", emet: x.doc.emet || x.nat, exp: x.doc.exp || ""}});
-    if (!ex) { p.pnr.ssr = ["DOCS"]; f.pax.push(p); PAX[p.id] = p; }
-    RES[p.id] = screen(p); if (RES[p.id].alerte && !ex) created++;
+    if (!ex) { if (!pn) p.pnr.ssr = ["DOCS"]; f.pax.push(p); PAX[p.id] = p; }
+    if (pn) { const keep = p.pnr.api; Object.entries(x.pnr).forEach(([k, val]) => { if (val != null && k !== "ssr") p.pnr[k] = val; }); p.pnr.ssr = Array.from(new Set(p.pnr.ssr.concat(x.pnr.ssr))); p.pnr.api = keep; filterSensitive(p); }
   });
-  RECEIVED.unshift({at: now, vol: fLabel(f), fid: f.id, n: r.pax.length, alertes: created});
-  audit("Réception PAXLST", `${fLabel(f)} · ${r.pax.length} voyageur(s)`);
+  screenAll(pn ? "Réception PNRGOV" : "Réception PAXLST");
+  created = Object.values(PAX).filter(p => RES[p.id].alerte && !before.has(p.id)).length;
+  RECEIVED.unshift({at: now, kind: pn ? "PNRGOV" : "PAXLST", vol: fLabel(f), fid: f.id, n: r.pax.length, alertes: created});
+  audit(pn ? "Réception PNRGOV" : "Réception PAXLST", `${fLabel(f)} · ${r.pax.length} voyageur(s)${pn && r.exclus ? ` · ${r.exclus} code(s) exclu(s) art. 11` : ""}`);
   return {f, created};
 }
 
@@ -763,6 +928,7 @@ function closeDrawer(){ $("#drawerhost").innerHTML = ""; document.body.style.ove
 
 /* =============== Fiche passager (fenêtre) =============== */
 function openPax(id, depers){
+  if (depers === undefined) depers = ROLE === "DPD";
   const p = PAX[id]; if (!p) return; const f = FLIGHTS.find(x => x.id === p.vol), r = RES[id], s = ALERT[id] || {statut: r.alerte ? "nouvelle" : null};
   if (!depers) audit("Consultation d'un dossier passager", `${p.nom} ${p.prenoms} · ${f.num}`);
   const m = v => depers ? `<span class="mask">••••••</span>` : esc(v);
@@ -779,7 +945,7 @@ function openPax(id, depers){
         <div class="card"><header><h3>DDP (annexe 2)</h3></header><dl class="kv">
           <dt>Code PNR</dt><dd>${esc(p.pnr.loc)}</dd><dt>Création</dt><dd>${dmy(p.pnr.creation)} ${hm(p.pnr.creation)}</dd><dt>Émission du billet</dt><dd>${dmy(p.pnr.emission)}</dd>
           <dt>Paiement</dt><dd>${esc(p.pnr.paiement)}</dd><dt>Trajet</dt><dd>${p.pnr.allerSimple ? "Aller simple" : "Aller-retour"}${p.pnr.arnk ? " · segment ARNK" : ""}</dd><dt>Agence</dt><dd>${esc(p.pnr.agence)}</dd>
-          <dt>Contact</dt><dd>${m("+226 7" + String(ri(0,9)) + " •• •• ••")}</dd><dt>Modifications 24 h</dt><dd>${p.pnr.modifs24h}</dd><dt>SSR conservés</dt><dd>${esc(p.pnr.ssr.join(", ") || "—")}</dd>
+          <dt>Téléphone</dt><dd>${m(p.pnr.tel || "—")}</dd><dt>Courriel</dt><dd>${p.pnr.email ? m(p.pnr.email) : "—"}</dd>${p.pnr.carte ? `<dt>Carte</dt><dd>${m(p.pnr.carte)}</dd>` : ""}<dt>Modifications 24 h</dt><dd>${p.pnr.modifs24h}</dd><dt>SSR conservés</dt><dd>${esc(p.pnr.ssr.join(", ") || "—")}</dd>
           ${p.pnr.exclus ? `<dt>Exclus (art. 11)</dt><dd>${p.pnr.exclus.length} élément(s) supprimé(s) à la réception</dd>` : ""}</dl></div>
       </section>
       ${r.incomplet && r.incomplet.length ? `<div class="msg m-red">Criblage incomplet : ${esc(r.incomplet.join(", "))} indisponible(s). Le passager sera recriblé au rétablissement.</div>` : ""}
@@ -787,33 +953,105 @@ function openPax(id, depers){
         ${r.hits.length ? r.hits.map(h => `<div class="hit"><span class="tag ${h.poids >= 50 ? "t-red" : "t-amber"}">${h.id} · ${h.poids}</span><div><b>${esc(h.nom)}</b><p>${depers && h.ref ? "Détail masqué" : esc(h.detail)}</p></div>${h.auto ? '<span class="tag t-red">automatique</span>' : ""}</div>`).join("") : '<p class="muted" style="margin:0">Aucune règle déclenchée.</p>'}
       </div>
       ${r.alerte && !depers ? alertForm(p, s) : ""}
+      <div class="card"><header><h3>Liens entre voyageurs</h3><span class="note">${links(p).length} lien(s) direct(s)</span></header>${linkGraph(p, depers)}</div>
+      <section class="grid h2">
+      <div class="card"><header><h3>Historique des voyages (UIP)</h3><span class="note">5 ans</span></header>${histView(p, depers)}</div>
       <div class="card"><header><h3>Passages aux frontières (MIDAS, simulation)</h3></header>${connOk("midas") ? (() => { const n = hashN(p.id) % 4; return n ? `<p class="note" style="margin:0">${n} passage(s) enregistré(s) à OUA ou BOY ; dernier le ${dmy(NOW0 - (hashN(p.nom) % 400 + 20) * DAY)}.</p>` : '<p class="note" style="margin:0">Aucun passage antérieur enregistré.</p>'; })() : '<div class="msg m-red">Base MIDAS indisponible.</div>'}</div>
+      </section>
+      ${depers || ROLE === "DPD" ? "" : dossCard(p)}
       ${s.statut === "transmise" && !depers ? `<div class="card"><header><h3>Fiche de transmission</h3><button class="btn sm" type="button" id="copyfiche">Copier</button></header><pre class="fiche" id="fichetxt">${esc(ficheText(p, f, r, s))}</pre></div>` : ""}
-      ${s.hist && s.hist.length ? `<div class="card"><header><h3>Historique de l'alerte</h3></header>${s.hist.map(h => `<div class="hit" style="grid-template-columns:auto minmax(0,1fr)"><span class="mono note">${hm(h.at)}</span><div><b>${esc(h.action)}</b><p>${esc(h.detail)}</p></div></div>`).join("")}</div>` : ""}
+      ${s.hist && s.hist.length ? `<div class="card"><header><h3>Historique de l'alerte</h3></header>${s.hist.map(h => `<div class="hit" style="grid-template-columns:auto minmax(0,1fr)"><span class="mono note">${hm(h.at)}</span><div><b>${esc(h.action)}</b><p>${esc(h.detail)}${h.qui ? ` · ${esc(h.qui)}` : ""}</p></div></div>`).join("")}</div>` : ""}
     </div>`;
   if (!dlg.open) dlg.showModal();
-  dlg.dataset.pax = id;
+  dlg.dataset.pax = id; dlg.dataset.doss = "";
+  const gw = dlg.querySelector(".gwrap"); if (gw) gw.scrollLeft = (gw.scrollWidth - gw.clientWidth) / 2;
+}
+function histView(p, depers){
+  const h = hist(p); if (!h.length) return '<p class="note" style="margin:0">Aucun voyage antérieur dans les données de l\'UIP.</p>';
+  return `<div class="hist">${h.map(x => { const old = NOW0 - x.t > 182*DAY; return `<div><span class="mono note">${dmy(x.t)}</span><span>${esc(x.vol)} · ${esc(x.route)}${x.compagnon && !depers ? `<span class="note"> · avec ${esc(x.compagnon)}</span>` : ""}</span>${old ? '<span class="tag t-grey" title="Plus de 6 mois : DDP dépersonnalisées (art. 19)">dépersonnalisé</span>' : '<span class="tag t-acc">actif</span>'}</div>`; }).join("")}</div>`;
+}
+function hist(p){
+  const n = hashN(p.nom + p.ddn) % 5, out = [];
+  for (let i = 0; i < n; i++){ const h = hashN(p.nom + p.ddn + "#" + i); const o = ORIG[h % ORIG.length][0]; const t = NOW0 - ((h >>> 5) % 1500 + 12) * DAY;
+    out.push({t, route: h & 1 ? `${o} → OUA` : `OUA → ${o}`, vol: CARRIERS[(h >>> 3) % 5].code + " " + (100 + (h >>> 7) % 800)}); }
+  if (p.nom === "VELTAMBO" || p.nom === "SANOU") out.push({t: NOW0 - 41*DAY, route: "BKO → OUA", vol: "ZY 418", compagnon: p.nom === "SANOU" ? "VELTAMBO Issaka" : "SANOU Boukary"}, {t: NOW0 - 97*DAY, route: "NIM → OUA", vol: "ZY 260", compagnon: p.nom === "SANOU" ? "VELTAMBO Issaka" : "SANOU Boukary"});
+  return out.sort((a, b) => b.t - a.t);
+}
+function linkGraph(p, depers){
+  const l1 = links(p).slice(0, 10);
+  if (!l1.length) return '<p class="note" style="margin:0">Aucun lien détecté avec un autre voyageur (même réservation, téléphone, carte ou courriel).</p>';
+  const W = 600, Hh = 330, cx = 300, cy = 150, nodes = [], edges = [], seen = new Set([p.id].concat(l1.map(x => x.p.id)));
+  l1.forEach((x, i) => { const a = Math.PI + i * 2 * Math.PI / l1.length + (l1.length > 2 ? Math.PI / l1.length : 0), nx = cx + Math.cos(a) * 140, ny = cy + Math.sin(a) * 85;
+    nodes.push({p: x.p, x: nx, y: ny, r: 8}); x.via.forEach((k, j) => edges.push({x1: cx, y1: cy, x2: nx, y2: ny, k, o: j}));
+    links(x.p).filter(y => !seen.has(y.p.id)).slice(0, 2).forEach((y, j, arr) => { seen.add(y.p.id); const b = a + (arr.length > 1 ? (j ? .28 : -.28) : 0), mx = cx + Math.cos(b) * 245, my = cy + Math.sin(b) * 125;
+      nodes.push({p: y.p, x: mx, y: my, r: 6}); y.via.forEach((k, jj) => edges.push({x1: nx, y1: ny, x2: mx, y2: my, k, o: jj})); }); });
+  const lab = q => depers ? "••••" : (q.nom.length > 12 ? q.nom.slice(0, 11) + "…" : q.nom);
+  const col = q => RES[q.id] && RES[q.id].alerte ? "var(--red)" : "var(--grey)";
+  const node = (q, x, y, r, c) => `<g ${c ? "" : `data-plink="${q.id}" tabindex="0" role="button" aria-label="Ouvrir ${depers ? "le voyageur" : esc(q.nom + " " + q.prenoms)}"`}><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r}" style="fill:${col(q)};stroke:var(--surface);stroke-width:2"/><text x="${x.toFixed(1)}" y="${(y + r + 13).toFixed(1)}" text-anchor="middle" style="fill:var(--ink);font:600 12px var(--f-body)">${esc(lab(q))}</text><text x="${x.toFixed(1)}" y="${(y + r + 25).toFixed(1)}" text-anchor="middle" style="fill:var(--muted);font:10px var(--f-mono)">${esc(FLIGHTS.find(f => f.id === q.vol).num)}</text></g>`;
+  const ed = edges.map(e => { const dx = e.x2 - e.x1, dy = e.y2 - e.y1, L = Math.hypot(dx, dy) || 1, ox = -dy / L * e.o * 4, oy = dx / L * e.o * 4;
+    return `<line x1="${(e.x1 + ox).toFixed(1)}" y1="${(e.y1 + oy).toFixed(1)}" x2="${(e.x2 + ox).toFixed(1)}" y2="${(e.y2 + oy).toFixed(1)}" style="stroke:${LK_COL[e.k]};stroke-width:2;opacity:.85"/>`; }).join("");
+  return `<div class="gwrap"><svg class="graph" viewBox="0 ${(Math.min(cy, ...nodes.map(n => n.y)) - 25).toFixed(0)} ${W} ${(Math.max(cy, ...nodes.map(n => n.y)) - Math.min(cy, ...nodes.map(n => n.y)) + 75).toFixed(0)}" role="img" aria-label="Graphe des liens du voyageur">${ed}${nodes.map(n => node(n.p, n.x, n.y, n.r)).join("")}${node(p, cx, cy, 12, true)}</svg></div>
+    <div class="lgd">${Object.keys(LK).map(k => `<span><i style="background:${LK_COL[k]}"></i>${LK[k]}</span>`).join("")}<span><i style="background:var(--red);height:9px;width:9px;border-radius:50%"></i>voyageur en alerte</span></div>
+    ${l1.map(x => `<div class="hit" style="cursor:pointer" data-plink="${x.p.id}">${scoreTag(RES[x.p.id].score)}<div><b>${depers ? "Identité masquée" : esc(x.p.nom + " " + x.p.prenoms)}</b><p>${esc(x.via.map(k => LK[k]).join(", "))} · ${esc(fLabel(FLIGHTS.find(f => f.id === x.p.vol)))}</p></div>${flagged(x.p.id) ? '<span class="tag t-red">signalé</span>' : ""}</div>`).join("")}`;
+}
+function dossCard(p){
+  const ins = DOSS.filter(d => d.pax.includes(p.id));
+  return `<div class="card"><header><h3>Dossiers d'enquête</h3></header>
+    ${ins.length ? `<p class="note" style="margin:0 0 10px">Inscrit dans : ${ins.map(d => `<a href="#dossiers" data-dopen="${d.id}">${esc(d.id)} · ${esc(d.titre)}</a>`).join(", ")}</p>` : ""}
+    <div class="row"><select id="d-sel" aria-label="Dossier" style="background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:6px 8px">${DOSS.filter(d => !d.pax.includes(p.id)).map(d => `<option value="${d.id}">${esc(d.id)} · ${esc(d.titre)}</option>`).join("")}<option value="new">Nouveau dossier…</option></select><button class="btn sm" type="button" id="d-add">Ajouter au dossier</button><button class="btn sm ghost" type="button" id="d-addlinks">Ajouter avec ses liens</button></div></div>`;
+}
+function openDossier(id){
+  const d = DOSS.find(x => x.id === id); if (!d) return; const dlg = $("#dlg"); dlg.dataset.pax = ""; dlg.dataset.doss = id;
+  audit("Consultation d'un dossier d'enquête", d.id);
+  const mem = d.pax.map(x => PAX[x]).filter(Boolean), ro = ROLE === "DPD";
+  const pairs = []; mem.forEach((a, i) => links(a).forEach(l => { if (mem.indexOf(l.p) > i) pairs.push(`${a.nom} ↔ ${l.p.nom} : ${l.via.map(k => LK[k]).join(", ")}`); }));
+  dlg.innerHTML = `<div class="mh"><div><span class="lbl">Dossier d'enquête · ${esc(d.id)}</span><h2 style="font-size:1.35rem">${esc(d.titre)}</h2></div><button class="btn" type="button" data-dclose>Fermer</button></div>
+    <div class="mb">
+      <div class="grid h2"><label class="field" for="d-title">Intitulé<input id="d-title" type="text" value="${esc(d.titre)}" ${ro ? "disabled" : ""}></label>
+        <label class="field" for="d-stat">Statut<select id="d-stat" ${ro ? "disabled" : ""}>${["Ouvert","En cours","Transmis à l'autorité judiciaire","Clos"].map(x => `<option ${d.statut === x ? "selected" : ""}>${x}</option>`).join("")}</select></label>
+        <label class="field" for="d-ref" style="grid-column:1/-1">Référence de la procédure<input id="d-ref" type="text" value="${esc(d.ref)}" ${ro ? "disabled" : ""}></label></div>
+      <div class="card"><header><h3>Voyageurs (${mem.length})</h3></header>
+        ${mem.length ? mem.map(q => { const f = FLIGHTS.find(x => x.id === q.vol); return `<div class="hit">${scoreTag(RES[q.id].score)}<div style="cursor:pointer" data-plink="${q.id}"><b>${ro ? "Identité masquée" : esc(q.nom + " " + q.prenoms)}</b><p>${esc(fLabel(f))} · ${dShort(fTime(f))} ${hm(fTime(f))}${RES[q.id].hits.length ? " · " + RES[q.id].hits.map(h => h.id).join(", ") : ""}</p></div>${ro ? "" : `<button class="btn sm ghost" type="button" data-drm="${q.id}">Retirer</button>`}</div>`; }).join("") : '<p class="muted" style="margin:0">Aucun voyageur. Ajoutez-en depuis une fiche passager.</p>'}</div>
+      <div class="card"><header><h3>Liens entre les voyageurs du dossier</h3></header>${pairs.length ? `<ul style="margin:0;padding-left:18px">${pairs.map(x => `<li>${esc(ro ? x.replace(/^[^:]+/, "•••• ↔ ••••") : x)}</li>`).join("")}</ul>` : '<p class="muted" style="margin:0">Aucun lien direct entre les voyageurs inscrits.</p>'}</div>
+      <div class="card"><header><h3>Notes</h3></header>
+        ${d.notes.map(n => `<div class="hit" style="grid-template-columns:auto minmax(0,1fr)"><span class="mono note">${dShort(n.at)} ${hm(n.at)}</span><div><b>${esc(n.qui)}</b><p>${esc(n.txt)}</p></div></div>`).join("")}
+        ${ro ? "" : `<div class="row" style="margin-top:8px"><input id="d-notetxt" type="text" placeholder="Constat, recoupement, demande à un service…" style="flex:1;min-width:0;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:7px 10px"><button class="btn sm pri" type="button" id="d-note">Ajouter</button></div>`}</div>
+      ${ro ? "" : `<div class="card"><header><h3>Synthèse</h3><button class="btn sm" type="button" id="d-copy">Copier</button></header><pre class="fiche" id="d-syn">${esc(dossText(d, mem, pairs))}</pre></div>`}
+    </div>`;
+  if (!dlg.open) dlg.showModal();
+}
+function dossText(d, mem, pairs){
+  return [`UNITÉ D'INFORMATION PASSAGERS · DSE`, `SYNTHÈSE DU DOSSIER ${d.id} · ${dmy(Date.now())}`, `Intitulé : ${d.titre}`, `Statut : ${d.statut} · procédure : ${d.ref}`, ``, `Voyageurs :`,
+    ...mem.map(q => { const f = FLIGHTS.find(x => x.id === q.vol); return `- ${q.nom} ${q.prenoms}, né(e) le ${q.ddn.split("-").reverse().join("/")}, ${q.nat} · ${f.num} ${f.origine} → ${f.dest} ${dmy(fTime(f))} · score ${RES[q.id].score}`; }),
+    ``, `Liens :`, ...(pairs.length ? pairs.map(x => "- " + x) : ["- aucun"]), ``, `Notes :`, ...(d.notes.length ? d.notes.map(n => `- ${dmy(n.at)} ${n.qui} : ${n.txt}`) : ["- aucune"]), ``,
+    `Usage limité aux finalités du décret. Diffusion ultérieure soumise à l'accord de l'UIP.`].join("\n");
 }
 function ficheText(p, f, r, s){
-  const last = s.hist.find(h => h.action.startsWith("Transmise")) || {};
+  const last = s.hist.find(h => h.action.startsWith("Transmission")) || {}, val = s.hist.find(h => h.action.startsWith("Transmise")) || {};
   return [`UNITÉ D'INFORMATION PASSAGERS · DSE`, `FICHE DE TRANSMISSION D'ALERTE · ${dmy(s.at)} ${hm(s.at)} GMT`, `Destinataire : ${s.service}`, ``,
     `Vol : ${f.num} ${f.origine} → ${f.dest} · ${f.sens === "Arrivée" ? "arrivée" : "départ"} ${dmy(fTime(f))} ${hm(fTime(f))} GMT`,
     `Voyageur : ${p.nom} ${p.prenoms} · ${p.sexe} · né(e) le ${p.ddn.split("-").reverse().join("/")} · ${p.nat}`,
     `Document : ${p.doc.type} ${p.doc.num} (${p.doc.emet}) · siège ${p.siege}`, ``, `Motifs (score ${r.score}) :`, ...r.hits.map(h => `- ${h.id} ${h.nom} : ${h.detail}`), ``,
-    `Décision de l'analyste : ${last.detail || "—"}`, ``, `Usage limité à la prévention et à la répression des infractions terroristes et de la criminalité grave. Diffusion ultérieure soumise à l'accord de l'UIP.`].join("\n");
+    `Proposition (${last.qui || "—"}) : ${last.detail || "—"}`, `Validation (${val.qui || "—"}) : ${val.detail || "—"}`, ``, `Usage limité à la prévention et à la répression des infractions terroristes et de la criminalité grave. Diffusion ultérieure soumise à l'accord de l'UIP.`].join("\n");
 }
 function alertForm(p, s){
   if (s.statut === "transmise" || s.statut === "ecartee") return "";
+  if (ROLE === "DPD") return '<div class="msg m-amber">Le profil Délégué à la protection des données consulte sans décider sur les alertes.</div>';
+  if (s.statut === "a_valider") return `<div class="card"><header><h3>Validation (double regard)</h3></header>
+    <p class="note" style="margin:0 0 10px">Transmission à <b style="color:var(--ink)">${esc(s.serviceProp)}</b> proposée par le profil ${esc(ROLE_LABEL[s.proposePar])}. Elle ne part qu'après validation par un autre profil habilité.</p>
+    ${canSup() && ROLE !== s.proposePar ? `<label class="field" for="a-motif">Observation du valideur (obligatoire pour un refus)<input id="a-motif" type="text" placeholder="Ex. éléments suffisants, transmission validée"></label>
+      <div class="row" style="margin-top:12px"><button class="btn red" type="button" data-adec="valider">Valider et transmettre</button><button class="btn ghost" type="button" data-adec="refuser">Refuser la proposition</button></div>`
+    : `<div class="msg m-amber">${ROLE === s.proposePar ? "Vous avez proposé cette transmission : un autre profil doit la valider." : "En attente d'un superviseur."} Changez de profil dans le bandeau du haut pour simuler la validation.</div>`}</div>`;
   return `<div class="card"><header><h3>Décision de l'analyste</h3></header>
     <div class="grid h2"><label class="field" for="a-svc">Service destinataire<select id="a-svc">${SERVICES.map(x => `<option>${esc(x)}</option>`).join("")}</select></label>
     <label class="field" for="a-motif">Motif de la décision (obligatoire)<input id="a-motif" type="text" placeholder="Ex. identité confirmée par la date de naissance et le document"></label></div>
-    <div class="row" style="margin-top:12px">${s.statut !== "en_examen" ? '<button class="btn" type="button" data-adec="en_examen">Prendre en charge</button>' : ""}<button class="btn red" type="button" data-adec="transmise">Confirmer et transmettre</button><button class="btn ghost" type="button" data-adec="ecartee">Écarter (faux positif)</button></div></div>`;
+    <div class="row" style="margin-top:12px">${s.statut !== "en_examen" ? '<button class="btn" type="button" data-adec="en_examen">Prendre en charge</button>' : ""}<button class="btn red" type="button" data-adec="transmise">Proposer la transmission</button><button class="btn ghost" type="button" data-adec="ecartee">Écarter (faux positif)</button></div></div>`;
 }
 
 /* =============== Dossier transporteur =============== */
 function openCarrier(code){
   const s = carrierStats().find(x => x.c.code === code); const pr = PROC[code] || (PROC[code] = {etape:0, hist:[]});
-  const dlg = $("#dlg"); dlg.dataset.pax = "";
+  const dlg = $("#dlg"); dlg.dataset.pax = ""; dlg.dataset.doss = "";
   dlg.innerHTML = `<div class="mh"><div><span class="lbl">Dossier de conformité · transporteur fictif</span><h2 style="font-size:1.35rem">${esc(s.c.nom)} (${esc(code)})</h2></div><button class="btn" type="button" data-dclose>Fermer</button></div>
     <div class="mb">
       <dl class="kv"><dt>Vols</dt><dd>${s.vols}</dd><dt>Envois exigibles</dt><dd>${s.due}</dd><dt>À l'heure</dt><dd>${s.ok} (${s.taux} %)</dd><dt>En retard</dt><dd>${s.late}</dd><dt>Non reçus</dt><dd>${s.miss}</dd></dl>
@@ -822,7 +1060,7 @@ function openCarrier(code){
         ${pr.etape === 3 ? `<label class="field" for="c-let">Manquement (art. 22)<select id="c-let"><option value="a">a · non-transmission</option><option value="b">b · format non conforme</option><option value="c" selected>c · hors délais</option><option value="d">d · données inexactes répétées</option><option value="e">e · faute ou négligence grave</option></select></label>
         <label class="field" for="c-mt">Montant proposé (FCFA)<input id="c-mt" type="number" min="2000000" max="5000000" step="100000" value="2000000"></label>` : ""}
         <label class="field" for="c-note" style="grid-column:1/-1">Observation<input id="c-note" type="text" placeholder="${pr.etape === 0 ? "Ex. 3 envois DDP H-24 manquants sur la semaine" : pr.etape === 1 ? "Ex. explication du transporteur reçue le …" : pr.etape === 2 ? "Ex. délai de 15 jours accordé" : "Ex. manquements persistants après le délai"}"></label></div>
-        <div class="row"><button class="btn pri" type="button" data-cstep="${code}">${["Notifier le manquement","Enregistrer l'explication","Accorder un délai de régularisation","Transmettre la proposition à l'ANAC"][pr.etape]}</button>${pr.etape ? `<button class="btn ghost" type="button" data-creset="${code}">Clore sans suite</button>` : ""}</div>`
+        <div class="row"><button class="btn pri" type="button" data-cstep="${code}" ${canSup() ? "" : "disabled"}>${["Notifier le manquement","Enregistrer l'explication","Accorder un délai de régularisation","Transmettre la proposition à l'ANAC"][pr.etape]}</button>${pr.etape ? `<button class="btn ghost" type="button" data-creset="${code}">Clore sans suite</button>` : ""}</div>`
       : `<div class="msg m-green">Proposition transmise à l'ANAC : ${esc(pr.lettre)} · ${Number(pr.montant).toLocaleString("fr-FR")} FCFA.</div>`}
       ${pr.hist.length ? `<div class="card"><header><h3>Historique</h3></header>${pr.hist.map(h => `<div class="hit" style="grid-template-columns:auto minmax(0,1fr)"><span class="mono note">${hm(h.at)}</span><div><b>${esc(h.action)}</b><p>${esc(h.detail)}</p></div></div>`).join("")}</div>` : ""}
     </div>`;
@@ -830,7 +1068,20 @@ function openCarrier(code){
 }
 
 /* =============== Navigation et événements =============== */
-const UI = {q:"", apt:"", sens:"", ast:"ouvertes", edi:""};
+const UI = {q:"", apt:"", sens:"", ast:"ouvertes", edi:"", fmt:"PAXLST"};
+/* Persistance locale (navigateur du visiteur seulement) */
+const STORE = "uip-demo-v3";
+function save(){ try { localStorage.setItem(STORE, JSON.stringify({ROLE, THRESHOLD, ALERT, PROC, DOSS, rules: RULES.map(r => [r.id, r.actif, r.poids]), watch: WATCH.slice(6), audit: AUDIT.slice(0, 300)})); } catch (e) {} }
+function load(){ let d; try { d = JSON.parse(localStorage.getItem(STORE) || "null"); } catch (e) { d = null; } if (!d) return;
+  try { if (ROLE_LABEL[d.ROLE]) ROLE = d.ROLE; if (d.THRESHOLD) THRESHOLD = d.THRESHOLD;
+    (d.rules || []).forEach(([id, a, w]) => { const r = RULES.find(x => x.id === id); if (r) { r.actif = a; r.poids = w; } });
+    (d.watch || []).forEach(w => { if (!WATCH.some(x => x.id === w.id)) WATCH.push(w); });
+    Object.entries(d.ALERT || {}).forEach(([k, v]) => { if (PAX[k]) ALERT[k] = v; });
+    Object.assign(PROC, d.PROC || {});
+    if (Array.isArray(d.DOSS) && d.DOSS.length) DOSS.splice(0, DOSS.length, ...d.DOSS.map(x => Object.assign(x, {pax: x.pax.filter(id => PAX[id])})));
+    if (Array.isArray(d.audit)) AUDIT.push(...d.audit);
+    screenAll();
+  } catch (e) {} }
 const SEARCH = {nom:"", doc:"", fin:"Prévention d'une infraction terroriste", ref:"", res:null};
 function doSearch(){
   SEARCH.nom = $("#s-nom").value.trim(); SEARCH.doc = $("#s-doc").value.trim(); SEARCH.fin = $("#s-fin").value; SEARCH.ref = $("#s-ref").value.trim();
@@ -850,6 +1101,7 @@ function render(){
   document.querySelectorAll("#nav a").forEach(a => a.getAttribute("href") === "#" + route ? a.setAttribute("aria-current","page") : a.removeAttribute("aria-current"));
   const foc = document.activeElement && document.activeElement.id === "f-q" ? document.activeElement.selectionStart : null;
   $("#view").innerHTML = VIEWS[route]();
+  $("#whorole").textContent = ROLE_LABEL[ROLE]; $("#role").value = ROLE; save();
   if (foc !== null) { const i = $("#f-q"); if (i) { i.focus(); try { i.setSelectionRange(foc, foc); } catch(e) {} } }
   cntAlert();
 }
@@ -860,14 +1112,26 @@ document.addEventListener("click", e => {
   const t = e.target;
   if (t.closest("[data-close]")) { closeDrawer(); return; }
   if (t.closest("[data-dclose]")) { $("#dlg").close(); return; }
+  const pl = t.closest("[data-plink]"); if (pl) { openPax(pl.dataset.plink); return; }
+  const dop = t.closest("[data-dopen]"); if (dop) { e.preventDefault(); openDossier(dop.dataset.dopen); return; }
   const px = t.closest("[data-pax]"); if (px && !t.closest("dialog")) { openPax(px.dataset.pax); return; }
   const fl = t.closest("[data-flight]"); if (fl) { openFlight(fl.dataset.flight); return; }
   const dec = t.closest("[data-adec]"); if (dec) { decide($("#dlg").dataset.pax, dec.dataset.adec); return; }
   const ca = t.closest("[data-carrier]"); if (ca) { openCarrier(ca.dataset.carrier); return; }
   const cs = t.closest("[data-cstep]"); if (cs) { carrierStep(cs.dataset.cstep); return; }
   const cr = t.closest("[data-creset]"); if (cr) { const pr = PROC[cr.dataset.creset]; pr.hist.unshift({at:Date.now(), action:"Procédure close sans suite", detail: ($("#c-note")||{}).value || "—"}); pr.etape = 0; audit("Procédure transporteur close", cr.dataset.creset); openCarrier(cr.dataset.creset); render(); return; }
-  if (t.id === "sample") { UI.edi = samplePaxlst(); PARSED = null; render(); return; }
-  if (t.id === "parse") { UI.edi = $("#edi").value; PARSED = parsePaxlst(UI.edi); render(); return; }
+  const fm = t.closest("[data-fmt]"); if (fm) { if (UI.fmt !== fm.dataset.fmt) { UI.fmt = fm.dataset.fmt; UI.edi = ""; PARSED = null; render(); } return; }
+  if (t.id === "sample") { UI.edi = UI.fmt === "PNRGOV" ? samplePnrgov() : samplePaxlst(); PARSED = null; render(); return; }
+  if (t.id === "parse") { UI.edi = $("#edi").value; PARSED = UI.fmt === "PNRGOV" ? parsePnrgov(UI.edi) : parsePaxlst(UI.edi); render(); return; }
+  if (t.id === "resetdemo") { if (confirm("Effacer les décisions, dossiers et réglages enregistrés dans ce navigateur ?")) { try { localStorage.removeItem(STORE); } catch (err) {} location.hash = ""; location.reload(); } return; }
+  if (t.id === "newdoss") { const d = {id: `DOS-2026-${pad(DOSS.length + 1).padStart(3, "0")}`, titre: "Nouveau dossier", statut: "Ouvert", ref: "À compléter", pax: [], notes: [], at: Date.now()}; DOSS.unshift(d); audit("Ouverture d'un dossier d'enquête", d.id); render(); openDossier(d.id); return; }
+  if (t.id === "d-add" || t.id === "d-addlinks") { const pid = $("#dlg").dataset.pax, p = PAX[pid]; let v = $("#d-sel").value, d;
+    if (v === "new") { d = {id: `DOS-2026-${pad(DOSS.length + 1).padStart(3, "0")}`, titre: `Voyageurs liés à ${p.nom}`, statut: "Ouvert", ref: "À compléter", pax: [], notes: [], at: Date.now()}; DOSS.unshift(d); audit("Ouverture d'un dossier d'enquête", d.id); } else d = DOSS.find(x => x.id === v);
+    const add = [pid].concat(t.id === "d-addlinks" ? links(p).map(l => l.p.id) : []).filter(x => !d.pax.includes(x)); d.pax.push(...add); d.at = Date.now();
+    audit("Ajout au dossier d'enquête", `${d.id} · ${add.length} voyageur(s)`); toast(`${add.length} voyageur(s) ajouté(s) au dossier ${d.id}.`); openPax(pid); render(); return; }
+  const drm = t.closest("[data-drm]"); if (drm) { const d = DOSS.find(x => x.id === $("#dlg").dataset.doss); d.pax = d.pax.filter(x => x !== drm.dataset.drm); d.at = Date.now(); audit("Retrait d'un voyageur du dossier", d.id); openDossier(d.id); render(); return; }
+  if (t.id === "d-note") { const d = DOSS.find(x => x.id === $("#dlg").dataset.doss), v = $("#d-notetxt").value.trim(); if (v.length < 3) { toast("Saisissez une note."); return; } d.notes.push({at: Date.now(), qui: ROLE_LABEL[ROLE], txt: v}); d.at = Date.now(); audit("Note ajoutée au dossier", d.id); openDossier(d.id); render(); return; }
+  if (t.id === "d-copy") { const txt = $("#d-syn").textContent; (navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject()).then(() => toast("Synthèse copiée."), () => toast("Copie impossible : sélectionnez le texte.")); return; }
   if (t.id === "ingest" && PARSED && PARSED.ok) { const {f, created} = ingest(PARSED); PARSED = null; UI.edi = ""; render(); toast(`${f.num} : message intégré, ${created} nouvelle(s) alerte(s).`); openFlight(f.id); return; }
   if (t.id === "addwatch") { openWatchForm(); return; }
   if (t.id === "dosearch") { doSearch(); return; }
@@ -893,18 +1157,27 @@ document.addEventListener("change", e => {
   else if (t.dataset.rule) { const r = RULES.find(x => x.id === t.dataset.rule); r.actif = t.checked; screenAll(); audit(t.checked ? "Activation d'une règle" : "Désactivation d'une règle", `${r.id} · ${r.nom}`); render(); }
   else if (t.dataset.poids) { const r = RULES.find(x => x.id === t.dataset.poids); r.poids = Math.max(0, Math.min(100, +t.value || 0)); screenAll(); audit("Modification du poids d'une règle", `${r.id} : ${r.poids}`); render(); }
   else if (t.id === "depers") openPax($("#dlg").dataset.pax, t.checked);
+  else if (t.id === "role") { ROLE = t.value; audit("Changement de profil (démonstration)", ROLE_LABEL[ROLE]); const dlg = $("#dlg"); if (dlg.open) { if (dlg.dataset.pax) openPax(dlg.dataset.pax); else if (dlg.dataset.doss) openDossier(dlg.dataset.doss); } render(); toast("Profil : " + ROLE_LABEL[ROLE]); }
+  else if (t.id === "d-title" || t.id === "d-stat" || t.id === "d-ref") { const d = DOSS.find(x => x.id === $("#dlg").dataset.doss); if (!d) return; const k = {"d-title":"titre","d-stat":"statut","d-ref":"ref"}[t.id]; d[k] = t.value.trim() || d[k]; d.at = Date.now(); audit("Modification d'un dossier", `${d.id} · ${k}`); render(); }
 });
 document.addEventListener("keydown", e => { if (e.key === "Escape" && $("#drawerhost").innerHTML && !$("#dlg").open) closeDrawer(); });
 
 function decide(id, statut){
+  if (ROLE === "DPD") { toast("Le profil DPD consulte sans décider."); return; }
   const p = PAX[id]; const s = ALERT[id] || (ALERT[id] = {statut:"nouvelle", hist:[]});
   const motif = ($("#a-motif") || {}).value ? $("#a-motif").value.trim() : "";
-  const svc = ($("#a-svc") || {}).value;
-  if (statut !== "en_examen" && motif.length < 5) { toast("Indiquez le motif de la décision avant de valider."); $("#a-motif").focus(); return; }
-  s.statut = statut; s.at = Date.now();
-  if (statut === "transmise") s.service = svc;
-  const action = {en_examen:"Prise en charge", transmise:`Transmise à ${svc}`, ecartee:"Écartée comme faux positif"}[statut];
-  s.hist.unshift({at: Date.now(), action, detail: motif || "—"});
+  const svc = ($("#a-svc") || {}).value; let action;
+  if (statut === "valider" || statut === "refuser") {
+    if (!canSup() || ROLE === s.proposePar) { toast("Double regard : la validation revient à un autre profil habilité."); return; }
+    if (statut === "refuser" && motif.length < 5) { toast("Indiquez le motif du refus."); $("#a-motif").focus(); return; }
+    if (statut === "valider") { s.statut = "transmise"; s.service = s.serviceProp; action = `Transmise à ${s.service}`; } else { s.statut = "en_examen"; action = "Proposition de transmission refusée"; }
+  } else {
+    if (statut !== "en_examen" && motif.length < 5) { toast("Indiquez le motif de la décision avant de valider."); $("#a-motif").focus(); return; }
+    if (statut === "transmise") { s.statut = "a_valider"; s.serviceProp = svc; s.proposePar = ROLE; action = `Transmission à ${svc} proposée`; }
+    else { s.statut = statut; action = {en_examen:"Prise en charge", ecartee:"Écartée comme faux positif"}[statut]; }
+  }
+  s.at = Date.now();
+  s.hist.unshift({at: Date.now(), action, detail: motif || (statut === "valider" ? "Validée sans observation" : "—"), qui: ROLE_LABEL[ROLE]});
   audit(`Alerte : ${action}`, `${p.nom} ${p.prenoms}`);
   toast(action); openPax(id); render();
 }
@@ -918,7 +1191,7 @@ function carrierStep(code){
   pr.etape++; openCarrier(code); render();
 }
 function openWatchForm(){
-  const dlg = $("#dlg"); dlg.dataset.pax = "";
+  const dlg = $("#dlg"); dlg.dataset.pax = ""; dlg.dataset.doss = "";
   dlg.innerHTML = `<div class="mh"><div><span class="lbl">Liste nationale</span><h2>Nouvelle fiche</h2></div><button class="btn" type="button" data-dclose>Fermer</button></div>
   <div class="mb"><div class="grid h2">
     <label class="field" for="w-nom">Nom<input id="w-nom" type="text"></label><label class="field" for="w-pre">Prénoms<input id="w-pre" type="text"></label>
@@ -936,6 +1209,8 @@ function saveWatch(){
   const hits = Object.values(RES).filter(x => x.hits.some(h => h.ref === w.id)).length;
   $("#dlg").close(); render(); toast(`Fiche ajoutée : ${hits} concordance(s) trouvée(s) dans les vols en cours.`);
 }
+{ const d0 = DOSS[0]; d0.pax = Object.values(PAX).filter(p => ["VELTAMBO","ZALIBOU"].includes(p.nom)).map(p => p.id); d0.notes = [{at: NOW0 - 3*H, qui: "Superviseur de quart", txt: "VELTAMBO et ZALIBOU partagent le même numéro de téléphone dans leurs réservations (exemple fictif)."}]; }
+load();
 render();
 })();
 </script>
