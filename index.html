@@ -211,6 +211,18 @@ pre.fiche{font-family:var(--f-mono);font-size:.78rem;background:var(--surface);b
   #printarea .card{break-inside:avoid}
 }
 @media (max-width:560px){.cond{grid-template-columns:1fr}}
+.tour-hl{outline:3px solid var(--amber)!important;outline-offset:4px;border-radius:6px;position:relative;z-index:5}
+#tourbox{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));width:min(380px,calc(100vw - 32px));background:var(--surface);border:1px solid var(--amber);border-radius:10px;padding:14px 16px;z-index:70;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+#tourbox h3{margin:2px 0 6px}
+#tourbox p{margin:0 0 10px;font-size:.9rem}
+.mapw{overflow-x:auto}
+.map{width:100%;min-width:620px;height:auto;display:block}
+.map .rt{cursor:pointer}
+.map .rt:hover path,.map .rt:focus path{stroke-opacity:1}
+.urg{animation:pl 1.6s infinite}
+.ptab input,.ptab select{width:100%;min-width:70px;background:var(--surface);border:1px solid var(--line);border-radius:5px;padding:5px 6px;font-size:.85rem}
+.ack{border:1px solid var(--line);border-radius:8px;padding:12px 14px;background:var(--raised)}
+.ack .mono{font-size:.85rem}
 @media (max-width:1100px){.k4{grid-template-columns:repeat(2,minmax(0,1fr))}.c2{grid-template-columns:minmax(0,1fr)}.h3{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:860px){
   .app{grid-template-columns:minmax(0,1fr)}
@@ -226,7 +238,7 @@ pre.fiche{font-family:var(--f-mono);font-size:.78rem;background:var(--surface);b
 </style>
 
 <div class="demo" role="note">Prototype de démonstration : toutes les compagnies, personnes et listes affichées sont fictives. Aucune donnée réelle ne doit être saisie ici (art. 15).
-  <span class="dctl"><label>Profil <select id="role" aria-label="Profil de démonstration"><option value="Analyste">Analyste</option><option value="Superviseur">Superviseur</option><option value="DPD">Délégué à la protection des données</option><option value="Administrateur">Administrateur</option></select></label><button type="button" id="qkbtn" title="Ctrl + K">Recherche rapide</button><button type="button" id="themebtn">Thème clair / sombre</button><button type="button" id="resetdemo">Réinitialiser la démo</button></span></div>
+  <span class="dctl"><label>Profil <select id="role" aria-label="Profil de démonstration"><option value="Analyste">Analyste</option><option value="Superviseur">Superviseur</option><option value="DPD">Délégué à la protection des données</option><option value="Administrateur">Administrateur</option></select></label><button type="button" id="tourbtn">Visite guidée</button><button type="button" id="qkbtn" title="Ctrl + K">Recherche rapide</button><button type="button" id="themebtn">Thème clair / sombre</button><button type="button" id="resetdemo">Réinitialiser la démo</button></span></div>
 <div class="app">
   <aside class="side">
     <div class="brand">
@@ -237,6 +249,7 @@ pre.fiche{font-family:var(--f-mono);font-size:.78rem;background:var(--surface);b
       <span class="navgrp">Veille</span>
       <a href="#veille">Salle de veille</a>
       <a href="#vols">Vols</a>
+      <a href="#carte">Carte des liaisons</a>
       <a href="#alertes">Alertes <span class="cnt" id="cnt-alertes"></span></a>
       <span class="navgrp">Analyse</span>
       <a href="#ciblage">Règles de ciblage</a>
@@ -249,6 +262,7 @@ pre.fiche{font-family:var(--f-mono);font-size:.78rem;background:var(--surface);b
       <span class="navgrp">Contrôle</span>
       <a href="#statistiques">Statistiques</a>
       <a href="#transporteurs">Transporteurs</a>
+      <a href="#portail">Portail transporteurs</a>
       <a href="#protection">Protection des données</a>
       <a href="#apropos">Architecture</a>
     </nav>
@@ -260,6 +274,7 @@ pre.fiche{font-family:var(--f-mono);font-size:.78rem;background:var(--surface);b
 <dialog id="dlg"></dialog>
 <dialog id="qk" aria-label="Recherche rapide"></dialog>
 <div id="printarea"></div>
+<div id="tourbox" hidden role="dialog" aria-label="Visite guidée"></div>
 
 <script>
 (() => {
@@ -285,7 +300,7 @@ function jw(a, b){ if (a === b) return 1; const la = a.length, lb = b.length; if
   if (!m) return 0; let t = 0, k = 0; for (let i = 0; i < la; i++) if (ma[i]) { while (!mb[k]) k++; if (a[i] !== b[k]) t++; k++; }
   const j = (m/la + m/lb + (m - t/2)/m) / 3; let p = 0; while (p < 4 && a[p] === b[p]) p++; return j + p * 0.1 * (1 - j); }
 const nameSim = (n1, p1, n2, p2) => { const A = norm(n1+" "+p1), B = norm(n2+" "+p2), C = norm(p2+" "+n2); return Math.max(jw(A,B), jw(A,C)); };
-function toast(m){ const t = document.createElement("div"); t.className = "toast"; t.textContent = m; document.body.appendChild(t); setTimeout(() => t.remove(), 2800); }
+function toast(m){ document.querySelectorAll(".toast").forEach(x => x.remove()); const t = document.createElement("div"); t.className = "toast"; t.textContent = m; document.body.appendChild(t); setTimeout(() => t.remove(), 2800); }
 
 /* =============== Référentiels (fictifs) =============== */
 const CARRIERS = [
@@ -554,7 +569,7 @@ veille(){
   <section class="grid k4">
     <div class="kpi"><span class="lbl">Vols suivis (-6 h / +72 h)</span><span class="v">${win72.length}</span><span class="s">${win72.filter(f=>f.local==="OUA").length} OUA · ${win72.filter(f=>f.local==="BOY").length} BOY</span></div>
     <div class="kpi"><span class="lbl">Passagers criblés</span><span class="v">${paxN}</span><span class="s">contre ${WATCH.length} fiches nationales et ${SLTD.length} documents signalés</span></div>
-    <div class="kpi alert"><span class="lbl">Alertes à traiter</span><span class="v">${oa.length}</span><span class="s">seuil de ciblage : ${THRESHOLD} points</span></div>
+    <div class="kpi alert"><span class="lbl">Alertes à traiter</span><span class="v">${oa.length}</span><span class="s">${(() => { const u = oa.filter(a => fTime(a.f) - now < 60*MIN && fTime(a.f) > now - 30*MIN).length; return u ? `<b style="color:var(--red)">${u} urgente(s)</b> : vol dans moins d'une heure` : `seuil de ciblage : ${THRESHOLD} points`; })()}</span></div>
     <div class="kpi"><span class="lbl">Transmissions à l'heure</span><span class="v">${all.due ? Math.round(all.ok/all.due*100) : 100}<small> %</small></span><span class="s">${all.ok} sur ${all.due} envois exigibles</span></div>
   </section>
   ${connBanner()}
@@ -596,7 +611,7 @@ alertes(){
     <div class="row"><button class="btn" type="button" id="exp-alertes">Exporter (CSV)</button></div></div>
   <div class="filters"><select id="f-ast" aria-label="Statut"><option value="ouvertes" ${UI.ast==="ouvertes"?"selected":""}>À traiter</option><option value="" ${!UI.ast?"selected":""}>Toutes</option><option value="a_valider" ${UI.ast==="a_valider"?"selected":""}>À valider (double regard)</option><option value="transmise" ${UI.ast==="transmise"?"selected":""}>Transmises</option><option value="ecartee" ${UI.ast==="ecartee"?"selected":""}>Écartées</option></select></div>
   <div class="tw"><table class="t min"><thead><tr><th>Score</th><th>Voyageur</th><th>Vol</th><th>Motif principal</th><th>Statut</th><th></th></tr></thead><tbody>
-  ${list.map(a => `<tr class="clk" data-pax="${a.p.id}"><td>${scoreTag(a.r.score)}</td><td><b>${esc(a.p.nom)} ${esc(a.p.prenoms)}</b><div class="note">${esc(a.p.statut)} · ${esc(a.p.nat)} · né(e) ${a.p.ddn.split("-").reverse().join("/")}</div></td><td>${esc(a.f.num)}<div class="note">${dShort(fTime(a.f))} ${hm(fTime(a.f))} · ${rel(fTime(a.f))}</div></td><td>${esc(a.r.hits[0].nom)}${a.r.hits.length > 1 ? ` <span class="note">+${a.r.hits.length - 1}</span>` : ""}</td><td>${alertTag(a.s)}${a.s.service ? `<div class="note">${esc(a.s.service)}</div>` : ""}</td><td><button class="btn sm" type="button">Examiner</button></td></tr>`).join("") || '<tr><td colspan="6" class="muted">Aucune alerte dans cette vue.</td></tr>'}
+  ${list.map(a => `<tr class="clk" data-pax="${a.p.id}"><td>${scoreTag(a.r.score)}</td><td><b>${esc(a.p.nom)} ${esc(a.p.prenoms)}</b><div class="note">${esc(a.p.statut)} · ${esc(a.p.nat)} · né(e) ${a.p.ddn.split("-").reverse().join("/")}</div></td><td>${esc(a.f.num)}<div class="note">${dShort(fTime(a.f))} ${hm(fTime(a.f))} · ${rel(fTime(a.f))}</div></td><td>${esc(a.r.hits[0].nom)}${a.r.hits.length > 1 ? ` <span class="note">+${a.r.hits.length - 1}</span>` : ""}</td><td>${alertTag(a.s)}${isOpen(a.s.statut) && fTime(a.f) - Date.now() < 60*MIN && fTime(a.f) > Date.now() - 30*MIN ? ' <span class="tag t-red urg" title="Vol dans moins d\'une heure">Urgent</span>' : ""}${a.s.service ? `<div class="note">${esc(a.s.service)}</div>` : ""}</td><td><button class="btn sm" type="button">Examiner</button></td></tr>`).join("") || '<tr><td colspan="6" class="muted">Aucune alerte dans cette vue.</td></tr>'}
   </tbody></table></div>`;
 },
 
@@ -652,9 +667,10 @@ transporteurs(){
   const st = carrierStats();
   return `
   <div class="head"><div><span class="lbl">Exploitants d'aéronefs (fictifs)</span><h1>Conformité des transporteurs</h1><p>Respect des délais et formats de transmission. L'amende (2 000 000 à 5 000 000 FCFA, art. 22) n'intervient qu'en dernier recours, après explication et délai de régularisation (art. 21). Elle est prononcée par l'ANAC.</p></div></div>
-  <div class="tw"><table class="t min"><thead><tr><th>Transporteur</th><th>Vols</th><th>Envois exigibles</th><th>À l'heure</th><th>En retard</th><th>Manquants</th><th>Taux</th><th>Procédure</th><th></th></tr></thead><tbody>
+  <div class="tw"><table class="t min"><thead><tr><th>Transporteur</th><th>Connexion</th><th>Vols</th><th>Envois exigibles</th><th>À l'heure</th><th>En retard</th><th>Manquants</th><th>Taux</th><th>Procédure</th><th></th></tr></thead><tbody>
   ${st.map(s => { const pr = PROC[s.c.code] || {etape:0}; const col = s.taux >= 95 ? "var(--green)" : s.taux >= 80 ? "var(--amber)" : "var(--red)";
-    return `<tr><td><b>${esc(s.c.nom)}</b> <span class="note mono">${s.c.code}</span></td><td class="n">${s.vols}</td><td class="n">${s.due}</td><td class="n">${s.ok}</td><td class="n">${s.late}</td><td class="n">${s.miss}</td><td><div class="row" style="flex-wrap:nowrap"><div class="rate"><i style="width:${s.taux}%;background:${col}"></i></div><span class="mono">${s.taux} %</span></div></td><td>${pr.etape ? `<span class="tag t-amber">${esc(PROC_STEPS[pr.etape])}</span>` : '<span class="muted">—</span>'}</td><td><button class="btn sm" type="button" data-carrier="${s.c.code}">Dossier</button></td></tr>`; }).join("")}
+    const cx = CONN_MODE[s.c.code] || {m: "Portail web UIP", st: "En test"};
+    return `<tr><td><b>${esc(s.c.nom)}</b> <span class="note mono">${s.c.code}</span></td><td>${esc(cx.m)}<div class="note">${cx.st === "Certifié" ? "Certifié" : '<span style="color:var(--amber)">' + esc(cx.st) + "</span>"}</div></td><td class="n">${s.vols}</td><td class="n">${s.due}</td><td class="n">${s.ok}</td><td class="n">${s.late}</td><td class="n">${s.miss}</td><td><div class="row" style="flex-wrap:nowrap"><div class="rate"><i style="width:${s.taux}%;background:${col}"></i></div><span class="mono">${s.taux} %</span></div></td><td>${pr.etape ? `<span class="tag t-amber">${esc(PROC_STEPS[pr.etape])}</span>` : '<span class="muted">—</span>'}</td><td><button class="btn sm" type="button" data-carrier="${s.c.code}">Dossier</button></td></tr>`; }).join("")}
   </tbody></table></div>
   <p class="note">Délai de mise en conformité : 6 mois après l'entrée en vigueur du décret (art. 24). Aucune sanction pour un incident imputable au système national (art. 22).</p>`;
 },
@@ -724,6 +740,60 @@ recherche(){
   </tbody></table></div>` : ""}`;
 },
 
+portail(){
+  const fls = ptFlights(); if (!fls.some(f => f.id === PORTAL.fid)) PORTAL.fid = fls[0] ? fls[0].id : "";
+  const f = FLIGHTS.find(x => x.id === PORTAL.fid), cx = CONN_MODE[PORTAL.car] || {m:"Portail web UIP", st:"En test"}, a = PORTAL.last;
+  const inp = (i, k, type, extra) => `<input data-ptr="${i}" data-ptk="${k}" type="${type}" value="${esc(PORTAL.rows[i][k])}" ${extra || ""} aria-label="${k} voyageur ${i + 1}">`;
+  return `
+  <div class="head"><div><span class="lbl">Vue transporteur · simulation</span><h1>Portail des transporteurs</h1><p>Les grandes compagnies envoient automatiquement depuis leur système d'enregistrement (API) et leur système de réservation (PNR). Ce portail sert aux compagnies sans système connecté (charters, aviation d'affaires) et aux tests de certification. Le transporteur ne voit jamais le résultat du criblage : il reçoit seulement un accusé de réception.</p></div></div>
+  <div class="card"><div class="grid h3">
+    <label class="field" for="pt-car">Compagnie<select id="pt-car">${CARRIERS.map(c => `<option value="${c.code}" ${c.code === PORTAL.car ? "selected" : ""}>${esc(c.nom)} (${c.code})</option>`).join("")}</select></label>
+    <label class="field" for="pt-vol">Vol<select id="pt-vol">${fls.map(x => `<option value="${x.id}" ${x.id === PORTAL.fid ? "selected" : ""}>${esc(x.num)} · ${x.origine} → ${x.dest} · ${dShort(x.std)} ${hm(x.std)}</option>`).join("") || "<option value=\"\">Aucun vol à venir</option>"}</select></label>
+    <label class="field" for="pt-env">Environnement<select id="pt-env"><option value="test" ${PORTAL.env === "test" ? "selected" : ""}>Test (certification, rien n'est intégré)</option><option value="prod" ${PORTAL.env === "prod" ? "selected" : ""}>Production</option></select></label></div>
+    <p class="note" style="margin:10px 0 0">Connexion déclarée de cette compagnie : <b style="color:var(--ink)">${esc(cx.m)}</b> · ${esc(cx.st)}.${f ? ` Prochaine échéance du vol ${esc(f.num)} : ${(() => { const w = WINDOWS.find(w => f.win[w.k].st === "a_venir"); return w ? `${w.l} à ${hm(f.win[w.k].due)} (${rel(f.win[w.k].due)})` : "aucune, tous les envois sont dus ou faits"; })()}.` : ""}</p></div>
+  <div class="card"><header><h2>Liste des passagers (RPCV)</h2><span class="seg-tg" role="group" aria-label="Mode d'envoi"><button type="button" data-ptmode="manuel" aria-pressed="${PORTAL.mode === "manuel"}">Saisie manuelle</button><button type="button" data-ptmode="fichier" aria-pressed="${PORTAL.mode === "fichier"}">Dépôt de fichier</button></span></header>
+    ${PORTAL.mode === "manuel" ? `<div class="tw ptab" style="border:0"><table class="t"><thead><tr><th>Nom</th><th>Prénoms</th><th>Sexe</th><th>Naissance</th><th>Nationalité</th><th>N° de passeport</th><th>Expiration</th><th></th></tr></thead><tbody>
+      ${PORTAL.rows.map((x, i) => `<tr><td>${inp(i, "nom", "text")}</td><td>${inp(i, "prenoms", "text")}</td><td><select data-ptr="${i}" data-ptk="sexe" aria-label="sexe voyageur ${i + 1}">${["M","F","X"].map(o => `<option ${x.sexe === o ? "selected" : ""}>${o}</option>`).join("")}</select></td><td>${inp(i, "ddn", "date")}</td><td>${inp(i, "nat", "text", 'maxlength="3" style="width:64px"')}</td><td>${inp(i, "doc", "text")}</td><td>${inp(i, "exp", "date")}</td><td>${PORTAL.rows.length > 1 ? `<button class="btn sm ghost" type="button" data-ptdel="${i}" aria-label="Retirer">×</button>` : ""}</td></tr>`).join("")}
+      </tbody></table></div>
+      <div class="row" style="margin-top:10px"><button class="btn sm" type="button" id="pt-add">Ajouter un voyageur</button><button class="btn sm ghost" type="button" id="pt-ex">Remplir avec un exemple fictif</button></div>
+      <p class="note" style="margin:8px 0 0">Le portail convertit la saisie au format PAXLST avant l'envoi, comme le ferait un système de départ.</p>`
+    : `<div class="row"><input type="file" id="pt-file" accept=".txt,.edi,.pax,.paxlst,text/plain" aria-label="Fichier PAXLST"><button class="btn sm ghost" type="button" id="pt-exfile">Générer un fichier d'exemple</button></div>
+      <label class="field" for="pt-txt" style="margin-top:10px">Contenu du fichier<textarea class="edi" id="pt-txt" spellcheck="false" placeholder="UNA:+.? '&#10;UNB+…">${esc(PORTAL.txt)}</textarea></label>`}
+    <div class="row" style="margin-top:12px"><button class="btn pri" type="button" id="pt-send" ${f ? "" : "disabled"}>${PORTAL.env === "test" ? "Envoyer en test" : "Envoyer à l'UIP"}</button></div></div>
+  ${a ? `<div class="ack"><div class="row" style="justify-content:space-between"><h2>Accusé de réception</h2>${a.ok ? `<span class="tag t-green">${a.env === "test" ? "Test réussi" : "Accepté"}</span>` : '<span class="tag t-red">Rejeté</span>'}</div>
+    <dl class="kv" style="margin-top:8px"><dt>Référence</dt><dd>${esc(a.ref)}</dd><dt>Reçu le</dt><dd>${dmy(a.at)} à ${hm(a.at)} GMT</dd><dt>Vol</dt><dd>${esc(a.vol)}</dd><dt>Voyageurs lus</dt><dd>${a.n}</dd><dt>Environnement</dt><dd>${a.env === "test" ? "Test : données non intégrées" : "Production"}</dd></dl>
+    ${a.errors.map(e => `<div class="msg m-red" style="margin-top:8px">${esc(e)}</div>`).join("")}${a.warnings.map(e => `<div class="msg m-amber" style="margin-top:8px">${esc(e)}</div>`).join("")}</div>` : ""}
+  ${PORTAL.hist.length ? `<div class="card"><header><h2>Envois de la session</h2></header><div class="tw" style="border:0"><table class="t"><thead><tr><th>Heure</th><th>Référence</th><th>Vol</th><th>Voyageurs</th><th>Environnement</th><th>Statut</th></tr></thead><tbody>${PORTAL.hist.map(h => `<tr><td class="n">${hm(h.at)}</td><td class="n">${esc(h.ref)}</td><td>${esc(h.vol)}</td><td class="n">${h.n}</td><td>${h.env === "test" ? "Test" : "Production"}</td><td>${h.ok ? '<span class="tag t-green">Accepté</span>' : '<span class="tag t-red">Rejeté</span>'}</td></tr>`).join("")}</tbody></table></div></div>` : ""}`;
+},
+
+carte(){
+  const now = Date.now(), fl = FLIGHTS.filter(f => fTime(f) > now - 6*H && fTime(f) < now + 72*H);
+  const R = {}; fl.forEach(f => { const o = f.sens === "Arrivée" ? f.origine : f.dest, k = o + "|" + f.local; const r = R[k] || (R[k] = {o, l: f.local, vols: 0, pax: 0, al: 0, arr: 0, dep: 0});
+    r.vols++; r.pax += f.pax.filter(p => p.statut === "Passager").length; r.al += f.pax.filter(p => RES[p.id].alerte).length; f.sens === "Arrivée" ? r.arr++ : r.dep++; });
+  const rows = Object.values(R).sort((a, b) => b.al - a.al || b.pax - a.pax);
+  /* Projection azimutale centrée sur Ouagadougou, distances compressées (racine carrée) pour aérer la sous-région */
+  const W = 840, Hh = 560, C0 = [390, 350], o0 = GEO.OUA, K = 50;
+  const polar = g => { const dx = (g[0] - o0[0]) * Math.cos(o0[1] * Math.PI / 180), dy = g[1] - o0[1], d = Math.hypot(dx, dy); return {r: K * Math.sqrt(d), a: Math.atan2(dy, dx), d}; };
+  const pt = c => { const g = GEO[c]; if (!g) return null; const q = polar(g); return [C0[0] + q.r * Math.cos(q.a), C0[1] - q.r * Math.sin(q.a)]; };
+  const grid = [[1000, 9], [3000, 27]].map(([km, deg]) => { const r = K * Math.sqrt(deg); return `<circle cx="${C0[0]}" cy="${C0[1]}" r="${r.toFixed(1)}" style="fill:none"/><text x="${C0[0] + 4}" y="${(C0[1] - r + 13).toFixed(1)}" style="fill:var(--muted);stroke:none;font:10px var(--f-mono)">≈ ${km.toLocaleString("fr-FR")} km</text>`; });
+  const routes = rows.map(r => { const a = pt(r.o), b = pt(r.l); if (!a || !b) return "";
+    const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2, dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy) || 1, cx = mx - dy / L * L * .18, cy = my + dx / L * L * .18;
+    return `<g class="rt" data-route="${r.o}" tabindex="0" role="button" aria-label="${esc(APT[r.o] || r.o)} – ${r.l} : ${r.vols} vol(s), ${r.pax} passagers, ${r.al} alerte(s)"><title>${esc(APT[r.o] || r.o)} ⇄ ${r.l} · ${r.vols} vol(s) · ${r.pax} passagers · ${r.al} alerte(s)</title><path d="M${a[0].toFixed(1)},${a[1].toFixed(1)} Q${cx.toFixed(1)},${cy.toFixed(1)} ${b[0].toFixed(1)},${b[1].toFixed(1)}" style="fill:none;stroke:${r.al ? "var(--red)" : "var(--accent)"};stroke-width:${(1.5 + r.pax / 70).toFixed(1)};stroke-opacity:.75;stroke-linecap:round"/></g>`; }).join("");
+  const codes = Array.from(new Set(rows.map(r => r.o))).concat(["OUA","BOY"]);
+  const dots = codes.map(c => { const q = pt(c); if (!q) return ""; const home = c === "OUA" || c === "BOY"; const al = rows.filter(r => r.o === c).reduce((s, r) => s + r.al, 0);
+    const ang = home ? (c === "OUA" ? Math.PI / 2 : Math.PI) : Math.atan2(C0[1] - q[1], q[0] - C0[0]), ux = Math.cos(ang), uy = -Math.sin(ang);
+    let anchor = ux > .35 ? "start" : ux < -.35 ? "end" : "middle", dx = ux * 11, dy = uy * 13 + 4;
+    if (c === "BRU") { anchor = "start"; dx = 9; dy = 0; } else if (c === "CDG") { anchor = "end"; dx = -9; dy = 8; }
+    return `<g ${home ? "" : `data-route="${c}" class="rt" tabindex="-1"`}><circle cx="${q[0].toFixed(1)}" cy="${q[1].toFixed(1)}" r="${home ? 7 : 4.5}" style="fill:${home ? "var(--amber)" : al ? "var(--red)" : "var(--ink)"};stroke:var(--surface);stroke-width:2"/><text x="${(q[0] + dx).toFixed(1)}" y="${(q[1] + dy).toFixed(1)}" text-anchor="${anchor}" style="fill:var(--ink);font:600 12px var(--f-body)">${c}</text></g>`; }).join("");
+  return `
+  <div class="head"><div><span class="lbl">Vols suivis de -6 h à +72 h</span><h1>Carte des liaisons</h1><p>Liaisons vers et depuis Ouagadougou et Bobo-Dioulasso. L'épaisseur suit le nombre de passagers ; en rouge, les liaisons avec au moins un voyageur en alerte. Cliquez une liaison pour voir ses vols.</p></div></div>
+  <div class="card"><div class="mapw"><svg class="map" viewBox="0 0 ${W} ${Hh}" role="img" aria-label="Carte schématique des liaisons aériennes"><g style="stroke:var(--line);stroke-width:1">${grid.join("")}</g>${routes}${dots}</svg></div>
+    <div class="lgd" style="margin-top:8px"><span><i style="background:var(--accent)"></i>liaison sans alerte</span><span><i style="background:var(--red)"></i>liaison avec alerte</span><span><i style="background:var(--amber);height:9px;width:9px;border-radius:50%"></i>aéroport national</span><span>Carte schématique centrée sur Ouagadougou, distances compressées</span></div></div>
+  <div class="tw"><table class="t min"><thead><tr><th>Liaison</th><th>Vols</th><th>Arrivées</th><th>Départs</th><th>Passagers</th><th>Alertes</th></tr></thead><tbody>
+  ${rows.map(r => `<tr class="clk" data-route="${r.o}"><td><b>${esc(APT[r.o] || r.o)}</b> <span class="note mono">${r.o}</span> ⇄ ${r.l}</td><td class="n">${r.vols}</td><td class="n">${r.arr}</td><td class="n">${r.dep}</td><td class="n">${r.pax}</td><td>${r.al ? `<span class="tag t-red">${r.al}</span>` : '<span class="muted">0</span>'}</td></tr>`).join("")}
+  </tbody></table></div>`;
+},
+
 cooperation(){
   const row = (o, dir) => `<tr class="clk" data-coop="${dir}:${o.id}"><td class="n">${esc(o.id)}</td><td>${esc(dir === "in" ? o.de : o.vers)}</td><td>${esc(o.objet)}</td><td class="n">${dShort(o.at)} ${hm(o.at)}</td><td><span class="tag ${/attente|instruire/i.test(o.statut) ? "t-amber" : /Refus/.test(o.statut) ? "t-grey" : "t-blue"}">${esc(o.statut)}</span></td></tr>`;
   return `
@@ -783,6 +853,8 @@ apropos(){
     <tr><td><b>Alertes</b></td><td>Transmission aux autorités compétentes</td><td>Décision motivée, choix du service</td><td>Diffusion sécurisée aux postes PAF et douane d'OUA et BOY, permanence 24/7</td></tr>
     <tr><td><b>Conservation</b></td><td>5 ans, dépersonnalisation à 6 mois (art. 19)</td><td>Politique affichée, aperçu dépersonnalisé</td><td>Tâches planifiées de masquage et de purge, réidentification sous contrôle du DPD</td></tr>
     <tr><td><b>Habilitations</b></td><td>Accès limité aux agents habilités, contrôle du DPD (art. 12 et 14)</td><td>4 profils simulés, double regard sur chaque transmission</td><td>Comptes nominatifs, authentification forte, annuaire de l'État, revue périodique des droits</td></tr>
+    <tr><td><b>Portail transporteurs</b></td><td>Envoi par les compagnies sans système connecté, tests préalables</td><td>Saisie manuelle ou dépôt de fichier, environnement de test, accusé de réception</td><td>Comptes par compagnie, authentification forte, certificats, campagne de certification avant l'entrée en vigueur</td></tr>
+    <tr><td><b>Visualisation</b></td><td>Appui à l'analyse</td><td>Carte schématique des liaisons, graphe des liens, visite guidée</td><td>Fond cartographique hébergé localement, couches par aéroport et par période</td></tr>
     <tr><td><b>Méthode push</b></td><td>Envoi par les transporteurs, jamais d'accès de l'UIP à leurs systèmes (art. 7 à 9)</td><td>Flux en direct simulé, accusés de réception</td><td>Messagerie sécurisée, accusés CONTRL, reprise automatique des envois en échec</td></tr>
     <tr><td><b>Scénarios</b></td><td>Critères préétablis, non discriminatoires (art. 13)</td><td>Scénarios composés de 2 critères ou plus, validation par un second profil, revue à 6 mois</td><td>Comité de validation avec le DPD, évaluation de l'efficacité</td></tr>
     <tr><td><b>Coopération</b></td><td>Échanges avec les UIP étrangères sous conditions</td><td>Instruction des demandes reçues, envoi de demandes</td><td>Canal sécurisé entre UIP, accords bilatéraux, journal des transferts</td></tr>
@@ -951,7 +1023,7 @@ function samplePaxlst(){
   L.push(`CNT+42:${people.length}'`, `UNT+${L.length - 2}+1'`, "UNE+1+1'", `UNZ+1+${ri(100000,999999)}'`);
   return L.join("\n");
 }
-function ingest(r){
+function ingest(r, src){
   const v = r.vol, pn = r.kind === "PNRGOV"; let f = FLIGHTS.find(x => x.num.replace(/\s/g,"") === v.num.replace(/\s/g,"") && (!v.std || Math.abs(x.std - v.std) < 12*H));
   if (!f) { const local = ["OUA","BOY"].includes(v.dest) ? v.dest : v.origine;
     f = {id: "F" + (FLIGHTS.length + 1) + "x", num: v.num, carrier: v.carrier, sens: ["OUA","BOY"].includes(v.dest) ? "Arrivée" : "Départ", origine: v.origine, dest: v.dest, std: v.std || Date.now() + 2*H, sta: v.sta || (v.std || Date.now()) + 4*H, local, win:{}, pax:[], source: pn ? "Message PNRGOV" : "Message PAXLST"};
@@ -972,7 +1044,7 @@ function ingest(r){
   created = Object.values(PAX).filter(p => RES[p.id].alerte && !before.has(p.id)).length;
   const ack = `CONTRL ${pad(ri(0,99))}${pad(ri(0,99))}${pad(ri(0,99))} · accepté`;
   RECEIVED.unshift({at: now, kind: pn ? "PNRGOV" : "PAXLST", vol: fLabel(f), fid: f.id, n: r.pax.length, alertes: created, ack});
-  LIVE.feed.unshift({at: now, t: "msg", txt: `${pn ? "PNRGOV" : "PAXLST"} intégré à la main · ${f.num}`, fid: f.id, ack});
+  LIVE.feed.unshift({at: now, t: "msg", txt: `${pn ? "PNRGOV" : "PAXLST"} intégré ${src || "à la main"} · ${f.num}`, fid: f.id, ack});
   audit(pn ? "Réception PNRGOV" : "Réception PAXLST", `${fLabel(f)} · ${r.pax.length} voyageur(s)${pn && r.exclus ? ` · ${r.exclus} code(s) exclu(s) art. 11` : ""}`);
   return {f, created};
 }
@@ -1030,6 +1102,7 @@ function openPax(id, depers){
       </section>
       ${depers || ROLE === "DPD" ? "" : dossCard(p)}
       ${s.statut === "transmise" && !depers ? `<div class="card"><header><h3>Fiche de transmission</h3><button class="btn sm" type="button" id="copyfiche">Copier</button></header><pre class="fiche" id="fichetxt">${esc(ficheText(p, f, r, s))}</pre></div>` : ""}
+      ${(() => { const acc = AUDIT.filter(x => String(x.objet).includes(`${p.nom} ${p.prenoms}`)).slice(0, 8); return acc.length ? `<div class="card"><header><h3>Accès à ce voyageur (art. 14)</h3><span class="note">${acc.length} dernier(s)</span></header>${acc.map(x => `<div class="hit" style="grid-template-columns:auto minmax(0,1fr)"><span class="mono note">${dShort(x.at)} ${hm(x.at)}</span><div><b>${esc(x.action)}</b><p>${esc(x.qui)}</p></div></div>`).join("")}</div>` : ""; })()}
       ${s.hist && s.hist.length ? `<div class="card"><header><h3>Historique de l'alerte</h3></header>${s.hist.map(h => `<div class="hit" style="grid-template-columns:auto minmax(0,1fr)"><span class="mono note">${hm(h.at)}</span><div><b>${esc(h.action)}</b><p>${esc(h.detail)}${h.qui ? ` · ${esc(h.qui)}` : ""}</p></div></div>`).join("")}</div>` : ""}
     </div>`;
   if (!dlg.open) dlg.showModal();
@@ -1166,6 +1239,68 @@ function doSearch(){
   audit("Recherche nominative", `${SEARCH.nom || ""} ${SEARCH.doc || ""} · ${SEARCH.fin} · réf. ${SEARCH.ref} · ${SEARCH.res.length} résultat(s)`);
   render();
 }
+/* ---------- Portail des transporteurs (vue transporteur simulée) ---------- */
+const CONN_MODE = {ZQ:{m:"Type B via SITA (DCS et réservation)", st:"Certifié"}, ZV:{m:"Type B via SITA (DCS et réservation)", st:"Certifié"}, ZK:{m:"File MQ sécurisée", st:"Certifié"}, ZW:{m:"HTTPS / AS2", st:"Certification en cours"}, ZY:{m:"Portail web UIP", st:"Certifié"}};
+const PORTAL = {car: "ZY", fid: "", mode: "manuel", env: "test", txt: "", rows: [], last: null, hist: []};
+const blankRow = () => ({nom:"", prenoms:"", sexe:"M", ddn:"", nat:"BFA", doc:"", exp:""});
+PORTAL.rows = [blankRow()];
+const ptFlights = () => FLIGHTS.filter(f => f.carrier === PORTAL.car && f.std > Date.now() - 2*H).slice(0, 12);
+function paxlstFor(f, people){
+  const yy = t => { const d = new Date(t); return `${String(d.getUTCFullYear()).slice(2)}${pad(d.getUTCMonth()+1)}${pad(d.getUTCDate())}`; };
+  const dt = t => yy(t) + pad(new Date(t).getUTCHours()) + pad(new Date(t).getUTCMinutes()); const fl = f.num.replace(" ", ""), now = Date.now();
+  const L = ["UNA:+.? '", `UNB+UNOA:4+${f.carrier}:ZZ+BFAUIP:ZZ+${yy(now)}:${hm(now).replace(":","")}+${ri(100000,999999)}'`, `UNG+PAXLST+${f.carrier}:ZZ+BFAUIP:ZZ+${yy(now)}:${hm(now).replace(":","")}+1+UN+D:05B'`,
+    `UNH+1+PAXLST:D:05B:UN:IATA+${fl}/${yy(f.std)}/${hm(f.std).replace(":","")}+01:F'`, "BGM+745'", `TDT+20+${fl}+++${f.carrier}'`, `LOC+125+${f.origine}'`, `DTM+189:${dt(f.std)}:201'`, `LOC+87+${f.dest}'`, `DTM+232:${dt(f.sta)}:201'`];
+  const ed = v => String(v || "").replace(/([?+:'])/g, "?$1");
+  people.forEach(x => L.push(`NAD+FL+++${ed(norm(x.nom))}:${ed(norm(x.prenoms))}'`, `ATT+2++${x.sexe}'`, `DTM+329:${String(x.ddn).slice(2).replace(/-/g,"")}'`, `LOC+178+${f.origine}'`, `LOC+179+${f.dest}'`, `NAT+2+${ed(x.nat)}'`,
+    `DOC+P:110:111+${ed(String(x.doc).toUpperCase().replace(/\s/g, ""))}'`, `DTM+36:${String(x.exp).slice(2).replace(/-/g,"")}'`, `LOC+91+${ed(x.nat)}'`));
+  L.push(`CNT+42:${people.length}'`, `UNT+${L.length - 2}+1'`, "UNE+1+1'", `UNZ+1+${ri(100000,999999)}'`);
+  return L.join("\n");
+}
+const PT_EX = [{nom:"ILBOUDO", prenoms:"Aminata", sexe:"F", ddn:"1989-02-14", nat:"BFA", doc:"B4410273", exp:"2031-06-30"}, {nom:"KEITA", prenoms:"Souleymane", sexe:"M", ddn:"1977-09-03", nat:"MLI", doc:"M2290118", exp:"2029-12-01"}, {nom:"MARTIN", prenoms:"Claire", sexe:"F", ddn:"1992-11-27", nat:"FRA", doc:"21FR88310", exp:"2032-03-15"}];
+function ptSend(){
+  const f = FLIGHTS.find(x => x.id === PORTAL.fid); if (!f) { toast("Choisissez un vol."); return; }
+  let txt;
+  if (PORTAL.mode === "manuel") { const bad = PORTAL.rows.findIndex(x => !x.nom.trim() || !x.ddn || !x.doc.trim() || !x.exp);
+    if (bad >= 0) { toast(`Voyageur ${bad + 1} : nom, date de naissance, document et expiration sont obligatoires.`); return; }
+    txt = paxlstFor(f, PORTAL.rows); } else { txt = PORTAL.txt; if (!txt.trim()) { toast("Déposez ou collez un fichier PAXLST."); return; } }
+  const r = parsePaxlst(txt), now = Date.now(), ref = `ACK-${PORTAL.car}-${String(now).slice(-6)}`;
+  if (r.ok && r.vol.carrier && r.vol.carrier !== PORTAL.car) { r.ok = false; r.errors.push(`Le message concerne un vol ${r.vol.carrier}, pas un vol de votre compagnie (${PORTAL.car}).`); }
+  if (r.ok && r.vol.num.replace(/\s/g, "") !== f.num.replace(/\s/g, "")) r.warnings.push(`Le message concerne le vol ${r.vol.num}, différent du vol choisi (${f.num}) : il est rattaché au vol du message.`);
+  const ack = {ref, at: now, env: PORTAL.env, vol: r.vol && r.vol.num || f.num, n: r.pax.length, ok: r.ok, errors: r.errors.slice(), warnings: r.warnings.slice()};
+  if (r.ok && PORTAL.env === "prod") { ingest(r, "via le portail transporteurs"); audit("Réception via le portail transporteurs", `${carName(PORTAL.car)} · ${ack.vol} · ${r.pax.length} voyageur(s)`); }
+  else audit(PORTAL.env === "test" ? "Envoi de test d'un transporteur" : "Envoi rejeté d'un transporteur", `${carName(PORTAL.car)} · ${ack.vol}`);
+  PORTAL.last = ack; PORTAL.hist.unshift(ack); render(); toast(r.ok ? (PORTAL.env === "test" ? "Test réussi : format conforme." : "Envoi accepté par l'UIP.") : "Envoi rejeté : voir l'accusé.");
+}
+
+/* ---------- Géographie (approximative) ---------- */
+const GEO = {OUA:[-1.51,12.35], BOY:[-4.33,11.16], ABJ:[-3.93,5.26], ADD:[38.8,8.98], IST:[28.8,41.0], CDG:[2.55,49.0], CMN:[-7.59,33.37], DSS:[-17.2,14.67], BKO:[-7.95,12.53], NIM:[2.18,13.48], LFW:[1.25,6.17], ACC:[-0.17,5.6], LOS:[3.32,6.58], BRU:[4.48,50.9], DXB:[55.36,25.25], CAI:[31.4,30.1]};
+
+/* ---------- Visite guidée ---------- */
+const TOUR = [
+  {route:"veille", sel:".kpi.alert", t:"Salle de veille", x:"Le point de départ de la permanence : vols suivis, passagers criblés, alertes à traiter et ponctualité des transporteurs."},
+  {route:"veille", sel:"#live-now", t:"Méthode push", x:"Les transporteurs poussent leurs messages vers le guichet unique ; chacun reçoit un accusé de réception puis est criblé. Ce bouton simule un envoi tout de suite."},
+  {route:"alertes", sel:"main .tw", t:"Alertes", x:"La file des voyageurs signalés. Ouvrez une ligne : l'analyste propose une transmission motivée, un superviseur la valide (double regard)."},
+  {route:"carte", sel:"main .card", t:"Carte des liaisons", x:"Les liaisons suivies, avec en rouge celles qui comptent un voyageur en alerte. Cliquez une liaison pour ses vols."},
+  {route:"ciblage", sel:"main .tw", t:"Règles de ciblage", x:"Dix règles et des scénarios composés d'au moins deux critères. La nationalité seule n'est jamais un critère (art. 13)."},
+  {route:"reception", sel:".seg-tg", t:"Réception API / PNR", x:"Lisez un message PAXLST (API) ou PNRGOV (PNR). Les données sensibles sont supprimées dès l'intégration (art. 11)."},
+  {route:"portail", sel:"main .card", t:"Portail des transporteurs", x:"Ce que voit une compagnie : elle envoie sa liste par saisie ou par fichier, d'abord en test, puis en production, et reçoit un accusé de réception. Elle ne voit jamais le résultat du criblage."},
+  {route:"cooperation", sel:"main .card", t:"Coopération internationale", x:"Les demandes des UIP partenaires sont instruites au cas par cas : finalité, demande individualisée, garanties."},
+  {route:"protection", sel:"main .policy", t:"Protection des données", x:"Dépersonnalisation à 6 mois, conservation 5 ans, et le journal d'audit de chaque accès (art. 14 et 19)."},
+  {route:null, sel:"#role", t:"Changer de profil", x:"Essayez les profils Superviseur et Délégué à la protection des données : les droits et les écrans changent. Bonne découverte !"}
+];
+let TOUR_I = -1;
+function tourHl(scroll){ document.querySelectorAll(".tour-hl").forEach(e => e.classList.remove("tour-hl")); const st = TOUR[TOUR_I]; if (!st) return; const el = $(st.sel); if (el) { el.classList.add("tour-hl"); if (scroll) el.scrollIntoView({block: "center", behavior: "smooth"}); } }
+function tourShow(){
+  const st = TOUR[TOUR_I]; if (!st) { tourEnd(); return; }
+  if ($("#dlg").open) $("#dlg").close(); closeDrawer();
+  if (st.route && (location.hash.slice(1) || "veille") !== st.route) location.hash = st.route;
+  const b = $("#tourbox"); b.hidden = false;
+  b.innerHTML = `<span class="lbl">Visite guidée · ${TOUR_I + 1} / ${TOUR.length}</span><h3>${esc(st.t)}</h3><p>${esc(st.x)}</p><div class="row" style="justify-content:space-between"><button class="btn sm ghost" type="button" id="tour-end">Quitter</button><span class="row">${TOUR_I ? '<button class="btn sm" type="button" id="tour-prev">Précédent</button>' : ""}<button class="btn sm pri" type="button" id="tour-next">${TOUR_I === TOUR.length - 1 ? "Terminer" : "Suivant"}</button></span></div>`;
+  setTimeout(() => tourHl(true), 150);
+}
+function tourStart(){ TOUR_I = 0; tourShow(); try { localStorage.setItem("uip-tour-vu", "1"); } catch (e) {} }
+function tourEnd(){ TOUR_I = -1; $("#tourbox").hidden = true; tourHl(false); }
+
 /* ---------- Flux en direct (méthode push simulée) ---------- */
 const LIVE = {on: true, feed: [], n: 0};
 const LIVE_CASES = [
@@ -1193,7 +1328,7 @@ function liveTick(){
 }
 function softRender(){ const h = location.hash.slice(1), route = VIEWS[h] ? h : "veille", a = document.activeElement;
   const busy = a && /INPUT|TEXTAREA|SELECT/.test(a.tagName) && $("#view").contains(a);
-  if (!busy && ["veille","vols","alertes","statistiques","cooperation"].includes(route)) { const y = window.scrollY; render(); window.scrollTo(0, y); } else cntAlert(); }
+  if (!busy && ["veille","vols","alertes","statistiques","cooperation","carte"].includes(route)) { const y = window.scrollY; render(); window.scrollTo(0, y); } else cntAlert(); }
 setInterval(() => { if (LIVE.on && !document.hidden) liveTick(); }, 30000);
 
 /* ---------- Coopération internationale (simulation) ---------- */
@@ -1276,7 +1411,7 @@ function scSave(){
 }
 
 /* ---------- Recherche rapide (Ctrl + K) ---------- */
-const PAGES = {veille:"Salle de veille", vols:"Vols", alertes:"Alertes", ciblage:"Règles de ciblage", listes:"Listes de surveillance", dossiers:"Dossiers d'enquête", reception:"Réception API / PNR", recherche:"Recherche nominative (motif obligatoire)", interconnexions:"Interconnexions", cooperation:"Coopération internationale", statistiques:"Statistiques", transporteurs:"Transporteurs", protection:"Protection des données", apropos:"Architecture"};
+const PAGES = {veille:"Salle de veille", vols:"Vols", carte:"Carte des liaisons", alertes:"Alertes", ciblage:"Règles de ciblage", listes:"Listes de surveillance", dossiers:"Dossiers d'enquête", reception:"Réception API / PNR", recherche:"Recherche nominative (motif obligatoire)", interconnexions:"Interconnexions", cooperation:"Coopération internationale", statistiques:"Statistiques", transporteurs:"Transporteurs", portail:"Portail transporteurs", protection:"Protection des données", apropos:"Architecture"};
 function qkResults(q){ q = norm(q); const out = [];
   Object.entries(PAGES).forEach(([k, l]) => { if (!q || norm(l).includes(q)) out.push({l, s:"Page", a:"page:" + k}); });
   if (q) { FLIGHTS.filter(f => norm(f.num + " " + f.origine + " " + f.dest + " " + (APT[f.origine] || "") + " " + (APT[f.dest] || "") + " " + carName(f.carrier)).includes(q)).slice(0, 6).forEach(f => out.push({l: fLabel(f), s: `Vol · ${dShort(fTime(f))} ${hm(fTime(f))}`, a: "flight:" + f.id}));
@@ -1308,7 +1443,7 @@ function render(){
   $("#view").innerHTML = VIEWS[route]();
   $("#whorole").textContent = ROLE_LABEL[ROLE]; $("#role").value = ROLE; save();
   if (foc !== null) { const i = $("#f-q"); if (i) { i.focus(); try { i.setSelectionRange(foc, foc); } catch(e) {} } }
-  cntAlert();
+  cntAlert(); if (TOUR_I >= 0) tourHl(false);
 }
 window.addEventListener("hashchange", () => { closeDrawer(); render(); window.scrollTo(0,0); });
 setInterval(() => { $("#clock").textContent = hm(Date.now()) + " GMT"; }, 1000); $("#clock").textContent = hm(Date.now()) + " GMT";
@@ -1337,6 +1472,17 @@ document.addEventListener("click", e => {
   if (t.id === "sample") { UI.edi = UI.fmt === "PNRGOV" ? samplePnrgov() : samplePaxlst(); PARSED = null; render(); return; }
   if (t.id === "parse") { UI.edi = $("#edi").value; PARSED = UI.fmt === "PNRGOV" ? parsePnrgov(UI.edi) : parsePaxlst(UI.edi); render(); return; }
   if (t.id === "live-now") { liveTick(); return; }
+  if (t.id === "tourbtn") { tourStart(); return; }
+  const ptm = t.closest("[data-ptmode]"); if (ptm) { PORTAL.mode = ptm.dataset.ptmode; render(); return; }
+  if (t.id === "pt-add") { PORTAL.rows.push(blankRow()); render(); return; }
+  const ptd = t.closest("[data-ptdel]"); if (ptd) { PORTAL.rows.splice(+ptd.dataset.ptdel, 1); render(); return; }
+  if (t.id === "pt-ex") { PORTAL.rows = PT_EX.map(x => Object.assign({}, x)); render(); return; }
+  if (t.id === "pt-exfile") { const f = FLIGHTS.find(x => x.id === PORTAL.fid); if (f) { PORTAL.txt = paxlstFor(f, PT_EX); render(); } return; }
+  if (t.id === "pt-send") { ptSend(); return; }
+  if (t.id === "tour-next") { TOUR_I++; tourShow(); return; }
+  if (t.id === "tour-prev") { TOUR_I--; tourShow(); return; }
+  if (t.id === "tour-end") { tourEnd(); return; }
+  const rt = t.closest("[data-route]"); if (rt) { UI.q = rt.dataset.route; UI.apt = ""; UI.sens = ""; location.hash = "vols"; return; }
   if (t.id === "live-toggle") { LIVE.on = !LIVE.on; audit(LIVE.on ? "Reprise du flux en direct" : "Pause du flux en direct", "Salle de veille"); render(); return; }
   if (t.id === "qkbtn") { openQk(); return; }
   if (t.id === "themebtn") { const cur = document.documentElement.dataset.theme || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark"); const nt = cur === "light" ? "dark" : "light"; applyTheme(nt); try { localStorage.setItem("uip-theme", nt); } catch (err) {} return; }
@@ -1369,6 +1515,8 @@ document.addEventListener("click", e => {
 document.addEventListener("input", e => {
   const t = e.target;
   if (t.id === "qk-in") { $("#qk-list").innerHTML = qkList(t.value); return; }
+  if (t.dataset.ptk) { PORTAL.rows[+t.dataset.ptr][t.dataset.ptk] = t.value; return; }
+  if (t.id === "pt-txt") { PORTAL.txt = t.value; return; }
   if (t.id === "f-q") { UI.q = t.value; render(); }
   else if (t.id === "edi") UI.edi = t.value;
   else if (t.id === "thr") { THRESHOLD = +t.value; screenAll(); render(); }
@@ -1384,11 +1532,17 @@ document.addEventListener("change", e => {
   else if (t.id === "depers") openPax($("#dlg").dataset.pax, t.checked);
   else if (t.dataset.scf !== undefined) { const i = +t.dataset.scf; $("#sc-r" + i).outerHTML = scRow(i, {champ: t.value, val: ""}); }
   else if (t.dataset.scen) { const x = SCEN.find(y => y.id === t.dataset.scen); x.actif = t.checked; screenAll(); audit(t.checked ? "Activation d'un scénario" : "Désactivation d'un scénario", `${x.id} · ${x.nom}`); render(); }
+  else if (t.id === "pt-car") { PORTAL.car = t.value; PORTAL.fid = ""; PORTAL.last = null; render(); }
+  else if (t.id === "pt-vol") { PORTAL.fid = t.value; render(); }
+  else if (t.id === "pt-env") { PORTAL.env = t.value; render(); }
+  else if (t.id === "pt-file") { const file = t.files && t.files[0]; if (!file) return; if (file.size > 2e6) { toast("Fichier trop volumineux (2 Mo au plus)."); return; } const rd = new FileReader(); rd.onload = () => { PORTAL.txt = String(rd.result || ""); render(); toast(`Fichier ${file.name} chargé.`); }; rd.readAsText(file); }
   else if (t.id === "role") { ROLE = t.value; audit("Changement de profil (démonstration)", ROLE_LABEL[ROLE]); const dlg = $("#dlg"); if (dlg.open) { if (dlg.dataset.pax) openPax(dlg.dataset.pax); else if (dlg.dataset.doss) openDossier(dlg.dataset.doss); } render(); toast("Profil : " + ROLE_LABEL[ROLE]); }
   else if (t.id === "d-title" || t.id === "d-stat" || t.id === "d-ref") { const d = DOSS.find(x => x.id === $("#dlg").dataset.doss); if (!d) return; const k = {"d-title":"titre","d-stat":"statut","d-ref":"ref"}[t.id]; d[k] = t.value.trim() || d[k]; d.at = Date.now(); audit("Modification d'un dossier", `${d.id} · ${k}`); render(); }
 });
 document.addEventListener("keydown", e => {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") { e.preventDefault(); openQk(); return; }
+  if (e.key === "Escape" && TOUR_I >= 0 && !$("#dlg").open && !$("#qk").open) { tourEnd(); return; }
+  if ((e.key === "Enter" || e.key === " ") && e.target.matches && e.target.matches("g[data-route],g[data-plink]")) { e.preventDefault(); e.target.dispatchEvent(new MouseEvent("click", {bubbles: true})); return; }
   if (e.key === "Enter" && e.target.id === "qk-in") { const b = $("#qk-list [data-qk]"); if (b) qkGo(b.dataset.qk); return; } if (e.key === "Escape" && $("#drawerhost").innerHTML && !$("#dlg").open) closeDrawer(); });
 
 function decide(id, statut){
@@ -1440,6 +1594,7 @@ function saveWatch(){
 }
 { const d0 = DOSS[0]; d0.pax = Object.values(PAX).filter(p => ["VELTAMBO","ZALIBOU"].includes(p.nom)).map(p => p.id); d0.notes = [{at: NOW0 - 3*H, qui: "Superviseur de quart", txt: "VELTAMBO et ZALIBOU partagent le même numéro de téléphone dans leurs réservations (exemple fictif)."}]; }
 load();
+try { if (!localStorage.getItem("uip-tour-vu") && !navigator.webdriver) setTimeout(tourStart, 900); } catch (e) {}
 LIVE.feed.push({at: NOW0 - 2*MIN, t:"msg", txt:"Session ouverte : écoute du guichet unique (méthode push)"});
 render();
 })();

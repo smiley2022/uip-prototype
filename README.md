@@ -5,6 +5,8 @@ Prototype de démonstration de la plateforme de l'Unité d'Information Passagers
 **Toutes les données (compagnies, passagers, listes, notices) sont fictives et générées dans le navigateur. Ne saisir aucune donnée réelle : le décret impose un hébergement sur infrastructures nationales (art. 15).**
 
 ## Modules
+- Portail des transporteurs (vue compagnie) : saisie manuelle ou dépôt de fichier PAXLST, environnement de test, accusé de réception
+- Carte des liaisons, visite guidée, alertes urgentes, historique des accès dans la fiche passager
 - Flux en direct selon la méthode push (les transporteurs envoient, l'UIP ne va jamais chercher les données), avec accusés de réception
 - Scénarios de ciblage composés (2 critères ou plus, validation par un second profil, revue à 6 mois)
 - Coopération internationale : instruction des demandes des UIP partenaires et envoi de demandes (simulation)
