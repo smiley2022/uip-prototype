@@ -187,6 +187,30 @@ pre.fiche{font-family:var(--f-mono);font-size:.78rem;background:var(--surface);b
 .hist{display:grid;gap:0}
 .hist div{display:grid;grid-template-columns:6.5em minmax(0,1fr) auto;gap:10px;padding:6px 0;border-bottom:1px solid var(--line);font-size:.86rem}
 .hist div:last-child{border-bottom:0}
+.feed{display:flex;flex-direction:column}
+.feed div{display:grid;grid-template-columns:4.2em auto minmax(0,1fr);gap:10px;align-items:start;padding:7px 0;border-bottom:1px solid var(--line);font-size:.86rem}
+.feed div:last-child{border-bottom:0}
+.feed .clk{cursor:pointer}
+.pulse{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);margin-right:6px;vertical-align:1px;animation:pl 1.6s infinite}
+.pulse.off{background:var(--grey);animation:none}
+@keyframes pl{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--green) 60%,transparent)}100%{box-shadow:0 0 0 8px transparent}}
+@media (prefers-reduced-motion:reduce){.pulse{animation:none}}
+#qk{width:min(620px,calc(100vw - 24px));margin-top:10vh}
+#qk input{width:100%;background:var(--surface);border:0;border-bottom:1px solid var(--line);padding:14px 18px;font-size:1.05rem;color:var(--ink);outline:none}
+#qk .qk-l{max-height:55vh;overflow:auto;padding:6px}
+.qk-r{display:flex;justify-content:space-between;gap:12px;width:100%;text-align:left;background:transparent;border:0;border-radius:6px;padding:9px 12px}
+.qk-r:hover,.qk-r:focus{background:var(--raised)}
+.qk-r span{color:var(--muted);font-size:.8rem;white-space:nowrap}
+.cond{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:10px}
+#printarea{display:none}
+@media print{
+  :root{--bg:#fff;--surface:#fff;--raised:#f4f4f4;--ink:#000;--muted:#444;--line:#bbb;color-scheme:light}
+  body>*:not(#printarea){display:none!important}
+  #printarea{display:block!important;font-size:12px}
+  #printarea button,#printarea .switch,#printarea select,#printarea input,#printarea .field{display:none!important}
+  #printarea .card{break-inside:avoid}
+}
+@media (max-width:560px){.cond{grid-template-columns:1fr}}
 @media (max-width:1100px){.k4{grid-template-columns:repeat(2,minmax(0,1fr))}.c2{grid-template-columns:minmax(0,1fr)}.h3{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:860px){
   .app{grid-template-columns:minmax(0,1fr)}
@@ -202,7 +226,7 @@ pre.fiche{font-family:var(--f-mono);font-size:.78rem;background:var(--surface);b
 </style>
 
 <div class="demo" role="note">Prototype de démonstration : toutes les compagnies, personnes et listes affichées sont fictives. Aucune donnée réelle ne doit être saisie ici (art. 15).
-  <span class="dctl"><label>Profil <select id="role" aria-label="Profil de démonstration"><option value="Analyste">Analyste</option><option value="Superviseur">Superviseur</option><option value="DPD">Délégué à la protection des données</option><option value="Administrateur">Administrateur</option></select></label><button type="button" id="resetdemo">Réinitialiser la démo</button></span></div>
+  <span class="dctl"><label>Profil <select id="role" aria-label="Profil de démonstration"><option value="Analyste">Analyste</option><option value="Superviseur">Superviseur</option><option value="DPD">Délégué à la protection des données</option><option value="Administrateur">Administrateur</option></select></label><button type="button" id="qkbtn" title="Ctrl + K">Recherche rapide</button><button type="button" id="themebtn">Thème clair / sombre</button><button type="button" id="resetdemo">Réinitialiser la démo</button></span></div>
 <div class="app">
   <aside class="side">
     <div class="brand">
@@ -221,6 +245,7 @@ pre.fiche{font-family:var(--f-mono);font-size:.78rem;background:var(--surface);b
       <a href="#reception">Réception API / PNR</a>
       <a href="#recherche">Recherche</a>
       <a href="#interconnexions">Interconnexions <span class="cnt" id="cnt-conn"></span></a>
+      <a href="#cooperation">Coopération internationale <span class="cnt" id="cnt-coop"></span></a>
       <span class="navgrp">Contrôle</span>
       <a href="#statistiques">Statistiques</a>
       <a href="#transporteurs">Transporteurs</a>
@@ -233,6 +258,8 @@ pre.fiche{font-family:var(--f-mono);font-size:.78rem;background:var(--surface);b
 </div>
 <div id="drawerhost"></div>
 <dialog id="dlg"></dialog>
+<dialog id="qk" aria-label="Recherche rapide"></dialog>
+<div id="printarea"></div>
 
 <script>
 (() => {
@@ -417,6 +444,24 @@ const RULES = [
   {id:"R9", nom:"Concordance avec une notice ou diffusion INTERPOL", poids:90, actif:true, auto:true, base:"Notices INTERPOL (simulation)"},
   {id:"R10", nom:"Lien avec une personne signalée (réservation, téléphone, carte ou courriel)", poids:50, actif:true, base:"Analyse des liens DDP"}
 ];
+/* Scénarios composés par les analystes : au moins deux critères objectifs de voyage (art. 13) */
+const SCEN_FIELDS = {
+  prov:{l:"Provenance du vol (codes aéroport)", t:"text", ph:"Ex. BKO, NIM", f:(p,f) => f.origine},
+  dest:{l:"Destination finale (codes aéroport)", t:"text", ph:"Ex. IST", f:p => p.destFinale},
+  paiement:{l:"Mode de paiement", t:"sel", o:["Espèces","Carte bancaire","Virement agence"], f:p => p.pnr.paiement},
+  trajet:{l:"Type de trajet", t:"sel", o:["Aller simple","Aller-retour"], f:p => p.pnr.allerSimple ? "Aller simple" : "Aller-retour"},
+  delai:{l:"Réservé moins de N heures avant le départ", t:"num", ph:"Ex. 72", f:(p,f) => (f.std - p.pnr.creation) / H},
+  bagages:{l:"Nombre de bagages au plus", t:"num", ph:"Ex. 0", f:p => p.bagages},
+  agence:{l:"Point de vente", t:"sel", o:AGENCES, f:p => p.pnr.agence},
+  modifs:{l:"Modifications en 24 h, au moins", t:"num", ph:"Ex. 2", f:p => p.pnr.modifs24h}
+};
+function condOk(c, p, f){ const F = SCEN_FIELDS[c.champ]; if (!F) return false; const v = F.f(p, f);
+  if (c.champ === "delai") return v >= 0 && v <= +c.val; if (c.champ === "bagages") return v <= +c.val; if (c.champ === "modifs") return v >= +c.val;
+  if (F.t === "text") return String(c.val).toUpperCase().split(/[\s,;]+/).filter(Boolean).includes(String(v).toUpperCase());
+  return v === c.val; }
+const condTxt = c => c.champ === "delai" ? `réservé moins de ${c.val} h avant le départ` : c.champ === "bagages" ? `${c.val} bagage(s) au plus` : c.champ === "modifs" ? `au moins ${c.val} modification(s) en 24 h` : `${SCEN_FIELDS[c.champ].l.replace(/ \(.*\)/, "").toLowerCase()} : ${c.val}`;
+const SCEN = [{id:"S1", nom:"Provenance BKO ou NIM, aller simple, sans bagage", poids:30, actif:true, statut:"Validé", parRole:"Superviseur", par:"Superviseur de quart", valPar:"Administrateur", at:NOW0 - 20*DAY, revue:NOW0 + 160*DAY,
+  conds:[{champ:"prov", val:"BKO, NIM"}, {champ:"trajet", val:"Aller simple"}, {champ:"bagages", val:"0"}]}];
 /* Analyse des liens : index des réservations, téléphones, cartes et courriels */
 const LK = {loc:"même réservation", tel:"même téléphone", carte:"même carte", email:"même courriel"};
 const LK_COL = {loc:"var(--accent)", tel:"var(--amber)", carte:"var(--red)", email:"var(--blue)"};
@@ -451,6 +496,7 @@ function screen(p){
   if (on("R6") && p.pnr.allerSimple && p.pnr.paiement === "Espèces" && f.std - p.pnr.creation < 48*H) add("R6", `Réservé ${Math.round((f.std - p.pnr.creation)/H)} h avant le départ`);
   if (on("R7") && p.pnr.arnk) add("R7", "Segment de surface non déclaré dans l'itinéraire");
   if (on("R8") && p.pnr.modifs24h >= 3) add("R8", `${p.pnr.modifs24h} modifications en 24 h`);
+  SCEN.filter(x => x.actif && x.statut === "Validé").forEach(x => { if (x.conds.every(c => condOk(c, p, f))) hits.push({id:x.id, nom:"Scénario : " + x.nom, poids:x.poids, detail:x.conds.map(condTxt).join(" · "), auto:false}); });
   const score = Math.min(100, hits.reduce((s,h) => s + h.poids, 0));
   return {hits, score, alerte: score >= THRESHOLD || hits.some(h => h.auto), incomplet};
 }
@@ -489,7 +535,7 @@ const stLabel = x => x.st === "recu" ? `reçu à ${hm(x.at)}` : x.st === "retard
 const alertTag = s => ({nouvelle:'<span class="tag t-red">Nouvelle</span>', en_examen:'<span class="tag t-amber">En examen</span>', a_valider:'<span class="tag t-amber">À valider</span>', transmise:'<span class="tag t-blue">Transmise</span>', ecartee:'<span class="tag t-grey">Écartée</span>'})[s.statut];
 const fLabel = f => `${f.num} · ${f.origine} → ${f.dest}`;
 const carName = code => (CARRIERS.find(c => c.code === code) || {nom: code}).nom;
-const cntAlert = () => { $("#cnt-alertes").textContent = openAlerts().length || ""; $("#cnt-conn").textContent = CONNECTORS.filter(c => c.etat !== "ok").length ? "!" : ""; };
+const cntAlert = () => { $("#cnt-alertes").textContent = openAlerts().length || ""; $("#cnt-coop").textContent = coopOpen() || ""; $("#cnt-conn").textContent = CONNECTORS.filter(c => c.etat !== "ok").length ? "!" : ""; };
 const connBanner = () => { const down = CONNECTORS.filter(c => c.etat !== "ok"); return down.length ? `<div class="msg m-red">Base indisponible : ${down.map(c => esc(c.nom)).join(", ")}. Les passagers criblés pendant l'incident sont marqués « criblage incomplet » et seront recriblés au rétablissement. <a href="#interconnexions">Voir les interconnexions</a></div>` : ""; };
 
 /* =============== Vues =============== */
@@ -502,7 +548,7 @@ veille(){
   const next = FLIGHTS.filter(f => fTime(f) > now - 2*H).slice(0, 10);
   const missingSoon = FLIGHTS.filter(f => f.std > now && f.std < now + 6*H && ["ddp1","ddp2"].some(k => f.win[k].st === "manquant"));
   return `
-  <div class="head"><div><span class="lbl">Cellule opérationnelle · ${new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long",year:"numeric"})}</span><h1>Salle de veille</h1>
+  <div class="head"><div><span class="lbl"><i class="pulse ${LIVE.on ? "" : "off"}"></i>${LIVE.on ? "En direct" : "Flux en pause"} · Cellule opérationnelle · ${new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long",year:"numeric"})}</span><h1>Salle de veille</h1>
     <p>Flux RPCV et DDP reçus via le guichet unique pour les aéroports de Ouagadougou (OUA) et Bobo-Dioulasso (BOY).</p></div>
     <div class="row"><a class="btn" href="#reception">Recevoir un message</a><a class="btn pri" href="#alertes">Traiter les alertes</a></div></div>
   <section class="grid k4">
@@ -521,7 +567,10 @@ veille(){
     <div class="card"><header><h2>Alertes prioritaires</h2><a href="#alertes">Toutes</a></header>
       ${oa.length ? oa.slice(0,6).map(a => `<div class="hit" style="cursor:pointer" data-pax="${a.p.id}">${scoreTag(a.r.score)}<div><b>${esc(a.p.nom)} ${esc(a.p.prenoms)}</b><p>${esc(a.r.hits[0].nom)} · ${esc(a.f.num)} ${hm(fTime(a.f))}</p></div>${alertTag(a.s)}</div>`).join("") : '<p class="muted">Aucune alerte en attente.</p>'}
     </div>
-  </section>`;
+  </section>
+  <div class="card"><header><h2><i class="pulse ${LIVE.on ? "" : "off"}"></i>Flux en direct · méthode push</h2><div class="row"><button class="btn sm" type="button" id="live-now">Simuler un envoi maintenant</button><button class="btn sm ghost" type="button" id="live-toggle">${LIVE.on ? "Mettre en pause" : "Reprendre"}</button></div></header>
+    <p class="note" style="margin:0 0 8px">Les transporteurs poussent leurs messages vers le guichet unique ; l'UIP ne va jamais les chercher. Chaque message reçoit un accusé de réception, puis il est filtré et criblé. Un envoi simulé arrive toutes les 30 secondes.</p>
+    <div class="feed">${LIVE.feed.length ? LIVE.feed.slice(0, 10).map(e => `<div class="${e.fid || e.pid ? "clk" : ""}" ${e.fid ? `data-flight="${e.fid}"` : e.pid ? `data-pax="${e.pid}"` : ""}><span class="mono note">${hm(e.at)}</span><span class="tag ${e.t === "alerte" ? "t-red" : e.t === "coop" ? "t-blue" : "t-green"}">${e.t === "alerte" ? "Alerte" : e.t === "coop" ? "Coopération" : "Reçu"}</span><span>${esc(e.txt)}${e.ack ? `<span class="note"> · accusé ${esc(e.ack)}</span>` : ""}</span></div>`).join("") : '<p class="muted" style="margin:0">En attente du prochain envoi des transporteurs…</p>'}</div></div>`;
 },
 
 vols(){
@@ -543,7 +592,8 @@ vols(){
 alertes(){
   const list = alerts().filter(a => !UI.ast || a.s.statut === UI.ast || (UI.ast === "ouvertes" && isOpen(a.s.statut))).sort((a,b) => (fTime(a.f) - fTime(b.f)) || b.r.score - a.r.score);
   return `
-  <div class="head"><div><span class="lbl">Cellule d'analyse des risques et de ciblage</span><h1>Alertes</h1><p>Une alerte n'est jamais transmise automatiquement : l'analyste vérifie, justifie et propose un service destinataire ; un superviseur valide la transmission (double regard). Chaque décision est tracée (art. 14).</p></div></div>
+  <div class="head"><div><span class="lbl">Cellule d'analyse des risques et de ciblage</span><h1>Alertes</h1><p>Une alerte n'est jamais transmise automatiquement : l'analyste vérifie, justifie et propose un service destinataire ; un superviseur valide la transmission (double regard). Chaque décision est tracée (art. 14).</p></div>
+    <div class="row"><button class="btn" type="button" id="exp-alertes">Exporter (CSV)</button></div></div>
   <div class="filters"><select id="f-ast" aria-label="Statut"><option value="ouvertes" ${UI.ast==="ouvertes"?"selected":""}>À traiter</option><option value="" ${!UI.ast?"selected":""}>Toutes</option><option value="a_valider" ${UI.ast==="a_valider"?"selected":""}>À valider (double regard)</option><option value="transmise" ${UI.ast==="transmise"?"selected":""}>Transmises</option><option value="ecartee" ${UI.ast==="ecartee"?"selected":""}>Écartées</option></select></div>
   <div class="tw"><table class="t min"><thead><tr><th>Score</th><th>Voyageur</th><th>Vol</th><th>Motif principal</th><th>Statut</th><th></th></tr></thead><tbody>
   ${list.map(a => `<tr class="clk" data-pax="${a.p.id}"><td>${scoreTag(a.r.score)}</td><td><b>${esc(a.p.nom)} ${esc(a.p.prenoms)}</b><div class="note">${esc(a.p.statut)} · ${esc(a.p.nat)} · né(e) ${a.p.ddn.split("-").reverse().join("/")}</div></td><td>${esc(a.f.num)}<div class="note">${dShort(fTime(a.f))} ${hm(fTime(a.f))} · ${rel(fTime(a.f))}</div></td><td>${esc(a.r.hits[0].nom)}${a.r.hits.length > 1 ? ` <span class="note">+${a.r.hits.length - 1}</span>` : ""}</td><td>${alertTag(a.s)}${a.s.service ? `<div class="note">${esc(a.s.service)}</div>` : ""}</td><td><button class="btn sm" type="button">Examiner</button></td></tr>`).join("") || '<tr><td colspan="6" class="muted">Aucune alerte dans cette vue.</td></tr>'}
@@ -563,6 +613,11 @@ ciblage(){
   <div class="tw"><table class="t min"><thead><tr><th>Actif</th><th>Règle</th><th>Données</th><th>Poids</th><th>Déclenchements</th></tr></thead><tbody>
   ${RULES.map(r => { const c = Object.values(RES).filter(x => x.hits.some(h => h.id === r.id)).length; return `<tr><td><label class="switch"><input type="checkbox" data-rule="${r.id}" ${r.actif?"checked":""} ${canSup() ? "" : "disabled"} aria-label="Activer ${esc(r.nom)}"></label></td><td><b>${r.id}</b> · ${esc(r.nom)} ${r.auto ? '<span class="tag t-red">automatique</span>' : ""}</td><td class="note">${esc(r.base)}</td><td><input type="number" min="0" max="100" step="5" value="${r.poids}" data-poids="${r.id}" ${canSup() ? "" : "disabled"} style="width:72px;background:var(--surface);border:1px solid var(--line);border-radius:5px;padding:4px 6px" aria-label="Poids ${r.id}"></td><td class="n">${c}</td></tr>`; }).join("")}
   </tbody></table></div>
+  <div class="card"><header><h2>Scénarios composés</h2><button class="btn sm pri" type="button" id="newscen" ${ROLE === "DPD" ? "disabled" : ""}>Nouveau scénario</button></header>
+    <p class="note" style="margin:0 0 10px">Un scénario combine au moins deux critères objectifs de voyage. La nationalité, le sexe et les données sensibles ne sont pas proposés (art. 11 et 13). Un scénario n'est actif qu'après validation par un autre profil habilité, et il est revu tous les 6 mois.</p>
+    <div class="tw" style="border:0"><table class="t min"><thead><tr><th>Actif</th><th>Scénario</th><th>Poids</th><th>Statut</th><th>Déclenchements</th><th>Revue</th><th></th></tr></thead><tbody>
+    ${SCEN.map(x => { const c = Object.values(RES).filter(r => r.hits.some(h => h.id === x.id)).length; return `<tr><td><label class="switch"><input type="checkbox" data-scen="${x.id}" ${x.actif ? "checked" : ""} ${canSup() && x.statut === "Validé" ? "" : "disabled"} aria-label="Activer ${esc(x.nom)}"></label></td><td><b>${x.id}</b> · ${esc(x.nom)}<div class="note">${esc(x.conds.map(condTxt).join(" · "))}</div><div class="note">Proposé par ${esc(x.par)}${x.valPar ? `, validé par ${esc(ROLE_LABEL[x.valPar] || x.valPar)}` : ""}</div></td><td class="n">${x.poids}</td><td>${x.statut === "Validé" ? '<span class="tag t-green">Validé</span>' : '<span class="tag t-amber">À valider</span>'}</td><td class="n">${c}</td><td class="n">${dShort(x.revue)}</td><td>${x.statut !== "Validé" && canSup() && ROLE !== x.parRole ? `<button class="btn sm pri" type="button" data-scval="${x.id}">Valider</button> ` : ""}${canSup() ? `<button class="btn sm ghost" type="button" data-scdel="${x.id}">Retirer</button>` : ""}</td></tr>`; }).join("") || '<tr><td colspan="7" class="muted">Aucun scénario.</td></tr>'}
+    </tbody></table></div></div>
   <p class="note">${canSup() ? "Les changements s'appliquent immédiatement à tous les vols et sont inscrits au journal d'audit." : "Lecture seule : seuls les profils Superviseur et Administrateur modifient les règles. Changez de profil dans le bandeau pour essayer."}</p>`;
 },
 
@@ -590,7 +645,7 @@ reception(){
     <div class="card" style="display:flex;flex-direction:column;gap:12px">${PARSED ? parsedView(PARSED) : '<p class="muted">Le résultat de la lecture apparaîtra ici : en-tête du vol, voyageurs, contrôles de cohérence et segments.</p>'}</div>
   </section>
   <div class="card"><header><h2>Messages intégrés pendant cette session</h2></header>
-    ${RECEIVED.length ? `<div class="tw" style="border:0"><table class="t"><thead><tr><th>Reçu à</th><th>Format</th><th>Vol</th><th>Voyageurs</th><th>Alertes créées</th></tr></thead><tbody>${RECEIVED.map(m => `<tr class="clk" data-flight="${m.fid}"><td class="n">${hm(m.at)}</td><td>${esc(m.kind || "PAXLST")}</td><td>${esc(m.vol)}</td><td class="n">${m.n}</td><td class="n">${m.alertes}</td></tr>`).join("")}</tbody></table></div>` : '<p class="muted">Aucun message intégré pour l\'instant.</p>'}</div>`;
+    ${RECEIVED.length ? `<div class="tw" style="border:0"><table class="t"><thead><tr><th>Reçu à</th><th>Format</th><th>Vol</th><th>Voyageurs</th><th>Alertes créées</th><th>Accusé de réception</th></tr></thead><tbody>${RECEIVED.map(m => `<tr class="clk" data-flight="${m.fid}"><td class="n">${hm(m.at)}</td><td>${esc(m.kind || "PAXLST")}</td><td>${esc(m.vol)}</td><td class="n">${m.n}</td><td class="n">${m.alertes}</td><td class="n">${esc(m.ack || "—")}</td></tr>`).join("")}</tbody></table></div>` : '<p class="muted">Aucun message intégré pour l\'instant.</p>'}</div>`;
 },
 
 transporteurs(){
@@ -669,6 +724,16 @@ recherche(){
   </tbody></table></div>` : ""}`;
 },
 
+cooperation(){
+  const row = (o, dir) => `<tr class="clk" data-coop="${dir}:${o.id}"><td class="n">${esc(o.id)}</td><td>${esc(dir === "in" ? o.de : o.vers)}</td><td>${esc(o.objet)}</td><td class="n">${dShort(o.at)} ${hm(o.at)}</td><td><span class="tag ${/attente|instruire/i.test(o.statut) ? "t-amber" : /Refus/.test(o.statut) ? "t-grey" : "t-blue"}">${esc(o.statut)}</span></td></tr>`;
+  return `
+  <div class="head"><div><span class="lbl">Échanges entre unités d'information passagers</span><h1>Coopération internationale</h1><p>Demandes adressées par les UIP partenaires et demandes envoyées par l'UIP du Burkina. Une réponse n'est accordée qu'au cas par cas : finalité conforme au décret, demande individualisée et garanties de protection des données. Les partenaires sont simulés.</p></div></div>
+  <div class="card"><header><h2>Demandes reçues</h2><span class="note">${COOP.in.filter(o => o.statut === "À instruire").length} à instruire</span></header>
+    <div class="tw" style="border:0"><table class="t min"><thead><tr><th>Référence</th><th>Demandeur</th><th>Objet</th><th>Reçue le</th><th>Statut</th></tr></thead><tbody>${COOP.in.map(o => row(o, "in")).join("")}</tbody></table></div></div>
+  <div class="card"><header><h2>Demandes envoyées</h2></header>
+    ${COOP.out.length ? `<div class="tw" style="border:0"><table class="t min"><thead><tr><th>Référence</th><th>Destinataire</th><th>Objet</th><th>Envoyée le</th><th>Statut</th></tr></thead><tbody>${COOP.out.map(o => row(o, "out")).join("")}</tbody></table></div>` : '<p class="muted" style="margin:0">Aucune demande envoyée. Depuis une fiche passager, utilisez « Interroger une UIP partenaire ».</p>'}</div>`;
+},
+
 dossiers(){
   return `
   <div class="head"><div><span class="lbl">Analyse et suivi</span><h1>Dossiers d'enquête</h1><p>Regroupez les voyageurs liés à une même affaire, consignez les recoupements et préparez une synthèse pour le service saisi. Chaque dossier porte la référence de la procédure qui justifie le traitement (art. 14).</p></div>
@@ -683,7 +748,7 @@ statistiques(){
   const al = alerts(), byS = {}; al.forEach(a => byS[a.s.statut] = (byS[a.s.statut] || 0) + 1);
   const tr = byS.transmise || 0, ec = byS.ecartee || 0;
   const bars = (rows, max, color) => `<div class="bars">${rows.map(([l, v]) => `<div class="b"><span title="${esc(l)}">${esc(l)}</span><div class="tr"><i style="width:${max ? Math.round(v / max * 100) : 0}%;${color ? `background:${typeof color === "function" ? color(v) : color}` : ""}"></i></div><b>${v}</b></div>`).join("")}</div>`;
-  const perRule = RULES.map(r => [`${r.id} · ${r.nom}`, al.filter(a => a.r.hits.some(h => h.id === r.id)).length]);
+  const perRule = RULES.concat(SCEN).map(r => [`${r.id} · ${r.nom}`, al.filter(a => a.r.hits.some(h => h.id === r.id)).length]);
   const st = [["Nouvelles","nouvelle"],["En examen","en_examen"],["À valider","a_valider"],["Transmises","transmise"],["Écartées","ecartee"]].map(([l, k]) => [l, byS[k] || 0]);
   const svc = {}; al.filter(a => a.s.statut === "transmise").forEach(a => svc[a.s.service] = (svc[a.s.service] || 0) + 1);
   const days = {}; FLIGHTS.forEach(f => { const k = iso(fTime(f)); days[k] = (days[k] || 0) + f.pax.filter(p => p.statut === "Passager").length; });
@@ -718,6 +783,9 @@ apropos(){
     <tr><td><b>Alertes</b></td><td>Transmission aux autorités compétentes</td><td>Décision motivée, choix du service</td><td>Diffusion sécurisée aux postes PAF et douane d'OUA et BOY, permanence 24/7</td></tr>
     <tr><td><b>Conservation</b></td><td>5 ans, dépersonnalisation à 6 mois (art. 19)</td><td>Politique affichée, aperçu dépersonnalisé</td><td>Tâches planifiées de masquage et de purge, réidentification sous contrôle du DPD</td></tr>
     <tr><td><b>Habilitations</b></td><td>Accès limité aux agents habilités, contrôle du DPD (art. 12 et 14)</td><td>4 profils simulés, double regard sur chaque transmission</td><td>Comptes nominatifs, authentification forte, annuaire de l'État, revue périodique des droits</td></tr>
+    <tr><td><b>Méthode push</b></td><td>Envoi par les transporteurs, jamais d'accès de l'UIP à leurs systèmes (art. 7 à 9)</td><td>Flux en direct simulé, accusés de réception</td><td>Messagerie sécurisée, accusés CONTRL, reprise automatique des envois en échec</td></tr>
+    <tr><td><b>Scénarios</b></td><td>Critères préétablis, non discriminatoires (art. 13)</td><td>Scénarios composés de 2 critères ou plus, validation par un second profil, revue à 6 mois</td><td>Comité de validation avec le DPD, évaluation de l'efficacité</td></tr>
+    <tr><td><b>Coopération</b></td><td>Échanges avec les UIP étrangères sous conditions</td><td>Instruction des demandes reçues, envoi de demandes</td><td>Canal sécurisé entre UIP, accords bilatéraux, journal des transferts</td></tr>
     <tr><td><b>Dossiers</b></td><td>Traitement au cas par cas, finalités du décret</td><td>Dossiers d'enquête, liens, synthèse</td><td>Gestion documentaire sécurisée, lien avec les procédures judiciaires</td></tr>
     <tr><td><b>Traçabilité</b></td><td>Journaux sécurisés (art. 14)</td><td>Journal de session</td><td>Journal infalsifiable, comptes nominatifs, authentification forte</td></tr>
     <tr><td><b>Hébergement</b></td><td>Infrastructures nationales (art. 15)</td><td>Page de démonstration</td><td>Centre de données national, homologation ANSSI</td></tr>
@@ -902,7 +970,9 @@ function ingest(r){
   });
   screenAll(pn ? "Réception PNRGOV" : "Réception PAXLST");
   created = Object.values(PAX).filter(p => RES[p.id].alerte && !before.has(p.id)).length;
-  RECEIVED.unshift({at: now, kind: pn ? "PNRGOV" : "PAXLST", vol: fLabel(f), fid: f.id, n: r.pax.length, alertes: created});
+  const ack = `CONTRL ${pad(ri(0,99))}${pad(ri(0,99))}${pad(ri(0,99))} · accepté`;
+  RECEIVED.unshift({at: now, kind: pn ? "PNRGOV" : "PAXLST", vol: fLabel(f), fid: f.id, n: r.pax.length, alertes: created, ack});
+  LIVE.feed.unshift({at: now, t: "msg", txt: `${pn ? "PNRGOV" : "PAXLST"} intégré à la main · ${f.num}`, fid: f.id, ack});
   audit(pn ? "Réception PNRGOV" : "Réception PAXLST", `${fLabel(f)} · ${r.pax.length} voyageur(s)${pn && r.exclus ? ` · ${r.exclus} code(s) exclu(s) art. 11` : ""}`);
   return {f, created};
 }
@@ -915,7 +985,7 @@ function openFlight(id){
   $("#drawerhost").innerHTML = `<div class="scrim" data-close></div><aside class="drawer" role="dialog" aria-modal="true" aria-label="Vol ${esc(f.num)}">
     <div class="dh"><div><span class="lbl">${esc(carName(f.carrier))} · ${f.sens} ${f.local}</span><h2 style="font-size:1.4rem">${esc(f.num)} · ${esc(APT[f.origine] || f.origine)} → ${esc(APT[f.dest] || f.dest)}</h2>
       <div class="note">Départ ${dmy(f.std)} ${hm(f.std)} · arrivée ${hm(f.sta)} (UTC) · ${f.pax.filter(p=>p.statut==="Passager").length} passagers, ${f.pax.filter(p=>p.statut!=="Passager").length} membres d'équipage</div></div>
-      <button class="btn" type="button" data-close>Fermer</button></div>
+      <div class="row"><button class="btn" type="button" data-expflight="${f.id}" ${f.pax.length ? "" : "disabled"}>Exporter le manifeste</button><button class="btn" type="button" data-close>Fermer</button></div></div>
     <div class="db">
       <div class="tline">${WINDOWS.map(w => { const x = f.win[w.k]; return `<div class="tl"><span class="lbl">${esc(w.l)} · ${w.art}</span><span class="w"><span class="win"><i class="w-${x.st}">${w.c}</i></span> ${x.st === "recu" ? "Reçu" : x.st === "retard" ? "En retard" : x.st === "manquant" ? "Non reçu" : "À venir"}</span><small>Échéance ${dShort(x.due)} ${hm(x.due)}${x.at ? ` · reçu ${hm(x.at)}` : ""}${x.ret ? ` (+${x.ret} min)` : ""}</small></div>`; }).join("")}</div>
       ${f.pax.length ? `<div class="tw"><table class="t min"><thead><tr><th>Score</th><th>Nom</th><th>Statut</th><th>Nat.</th><th>Naissance</th><th>Document</th><th>Siège</th><th>Motifs</th></tr></thead><tbody>
@@ -934,7 +1004,7 @@ function openPax(id, depers){
   const m = v => depers ? `<span class="mask">••••••</span>` : esc(v);
   const dlg = $("#dlg");
   dlg.innerHTML = `<div class="mh"><div><span class="lbl">${esc(p.statut)} · ${esc(fLabel(f))} · ${dShort(fTime(f))} ${hm(fTime(f))}</span><h2 style="font-size:1.35rem">${depers ? "Identité masquée" : `${esc(p.nom)} ${esc(p.prenoms)}`}</h2></div>
-    <div class="row">${scoreTag(r.score)}${s.statut ? alertTag(s) : ""}<button class="btn" type="button" data-dclose>Fermer</button></div></div>
+    <div class="row">${scoreTag(r.score)}${s.statut ? alertTag(s) : ""}<button class="btn" type="button" id="printfiche">Imprimer</button><button class="btn" type="button" data-dclose>Fermer</button></div></div>
     <div class="mb">
       <div class="row" style="justify-content:space-between"><label class="switch"><input type="checkbox" id="depers" ${depers ? "checked" : ""}> Aperçu après dépersonnalisation (art. 19)</label><span class="note">Consultation inscrite au journal d'audit</span></div>
       <section class="grid h2">
@@ -963,7 +1033,7 @@ function openPax(id, depers){
       ${s.hist && s.hist.length ? `<div class="card"><header><h3>Historique de l'alerte</h3></header>${s.hist.map(h => `<div class="hit" style="grid-template-columns:auto minmax(0,1fr)"><span class="mono note">${hm(h.at)}</span><div><b>${esc(h.action)}</b><p>${esc(h.detail)}${h.qui ? ` · ${esc(h.qui)}` : ""}</p></div></div>`).join("")}</div>` : ""}
     </div>`;
   if (!dlg.open) dlg.showModal();
-  dlg.dataset.pax = id; dlg.dataset.doss = "";
+  dlg.dataset.pax = id; dlg.dataset.doss = ""; dlg.dataset.coopkey = "";
   const gw = dlg.querySelector(".gwrap"); if (gw) gw.scrollLeft = (gw.scrollWidth - gw.clientWidth) / 2;
 }
 function histView(p, depers){
@@ -998,7 +1068,8 @@ function dossCard(p){
   const ins = DOSS.filter(d => d.pax.includes(p.id));
   return `<div class="card"><header><h3>Dossiers d'enquête</h3></header>
     ${ins.length ? `<p class="note" style="margin:0 0 10px">Inscrit dans : ${ins.map(d => `<a href="#dossiers" data-dopen="${d.id}">${esc(d.id)} · ${esc(d.titre)}</a>`).join(", ")}</p>` : ""}
-    <div class="row"><select id="d-sel" aria-label="Dossier" style="background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:6px 8px">${DOSS.filter(d => !d.pax.includes(p.id)).map(d => `<option value="${d.id}">${esc(d.id)} · ${esc(d.titre)}</option>`).join("")}<option value="new">Nouveau dossier…</option></select><button class="btn sm" type="button" id="d-add">Ajouter au dossier</button><button class="btn sm ghost" type="button" id="d-addlinks">Ajouter avec ses liens</button></div></div>`;
+    <div class="row"><select id="d-sel" aria-label="Dossier" style="background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:6px 8px">${DOSS.filter(d => !d.pax.includes(p.id)).map(d => `<option value="${d.id}">${esc(d.id)} · ${esc(d.titre)}</option>`).join("")}<option value="new">Nouveau dossier…</option></select><button class="btn sm" type="button" id="d-add">Ajouter au dossier</button><button class="btn sm ghost" type="button" id="d-addlinks">Ajouter avec ses liens</button></div>
+    <div class="row" style="margin-top:10px"><button class="btn sm" type="button" id="coop-ask">Interroger une UIP partenaire</button>${COOP.out.filter(o => o.pax === p.id).map(o => `<span class="tag ${o.statut === "En attente" ? "t-amber" : "t-blue"}">${esc(o.vers)} : ${esc(o.statut)}</span>`).join(" ")}</div></div>`;
 }
 function openDossier(id){
   const d = DOSS.find(x => x.id === id); if (!d) return; const dlg = $("#dlg"); dlg.dataset.pax = ""; dlg.dataset.doss = id;
@@ -1070,8 +1141,8 @@ function openCarrier(code){
 /* =============== Navigation et événements =============== */
 const UI = {q:"", apt:"", sens:"", ast:"ouvertes", edi:"", fmt:"PAXLST"};
 /* Persistance locale (navigateur du visiteur seulement) */
-const STORE = "uip-demo-v3";
-function save(){ try { localStorage.setItem(STORE, JSON.stringify({ROLE, THRESHOLD, ALERT, PROC, DOSS, rules: RULES.map(r => [r.id, r.actif, r.poids]), watch: WATCH.slice(6), audit: AUDIT.slice(0, 300)})); } catch (e) {} }
+const STORE = "uip-demo-v4";
+function save(){ try { localStorage.setItem(STORE, JSON.stringify({ROLE, THRESHOLD, ALERT, PROC, DOSS, rules: RULES.map(r => [r.id, r.actif, r.poids]), watch: WATCH.slice(6), audit: AUDIT.slice(0, 300), SCEN, COOP: {in: COOP.in, out: COOP.out.filter(o => PAX[o.pax])}, live: LIVE.on})); } catch (e) {} }
 function load(){ let d; try { d = JSON.parse(localStorage.getItem(STORE) || "null"); } catch (e) { d = null; } if (!d) return;
   try { if (ROLE_LABEL[d.ROLE]) ROLE = d.ROLE; if (d.THRESHOLD) THRESHOLD = d.THRESHOLD;
     (d.rules || []).forEach(([id, a, w]) => { const r = RULES.find(x => x.id === id); if (r) { r.actif = a; r.poids = w; } });
@@ -1080,6 +1151,9 @@ function load(){ let d; try { d = JSON.parse(localStorage.getItem(STORE) || "nul
     Object.assign(PROC, d.PROC || {});
     if (Array.isArray(d.DOSS) && d.DOSS.length) DOSS.splice(0, DOSS.length, ...d.DOSS.map(x => Object.assign(x, {pax: x.pax.filter(id => PAX[id])})));
     if (Array.isArray(d.audit)) AUDIT.push(...d.audit);
+    if (Array.isArray(d.SCEN) && d.SCEN.length) SCEN.splice(0, SCEN.length, ...d.SCEN);
+    if (d.COOP) { if (Array.isArray(d.COOP.in)) COOP.in = d.COOP.in; if (Array.isArray(d.COOP.out)) COOP.out = d.COOP.out; }
+    if (d.live === false) LIVE.on = false;
     screenAll();
   } catch (e) {} }
 const SEARCH = {nom:"", doc:"", fin:"Prévention d'une infraction terroriste", ref:"", res:null};
@@ -1092,6 +1166,137 @@ function doSearch(){
   audit("Recherche nominative", `${SEARCH.nom || ""} ${SEARCH.doc || ""} · ${SEARCH.fin} · réf. ${SEARCH.ref} · ${SEARCH.res.length} résultat(s)`);
   render();
 }
+/* ---------- Flux en direct (méthode push simulée) ---------- */
+const LIVE = {on: true, feed: [], n: 0};
+const LIVE_CASES = [
+  {nom:"TIEMBOLLO", prenoms:"Ousseni", ddn:"1985-07-22", sexe:"M", nat:"BFA"},
+  {nom:"DIALLO", prenoms:"Fatou", ddn:"2001-06-11", sexe:"F", nat:"SEN", doc:{type:"P", num:"A9930017", emet:"MLI", exp:"2030-01-15"}},
+  {nom:"SAWADOGO", prenoms:"Adama", ddn:"1994-08-08", sexe:"M", nat:"BFA", pnr:{tel:"+226 76 41 08 52", paiement:"Espèces", allerSimple:true}},
+  {nom:"KAPRISO", prenoms:"Daniel", ddn:"1972-11-14", sexe:"M", nat:"TGO"}
+];
+const COOP_REP = ["Aucun voyage connu sur les 12 derniers mois.", "2 voyages connus (ABJ → OUA, OUA → ABJ) ; aucun signalement.", "Personne connue des services partenaires : prendre contact avec l'officier de liaison.", "Voyage confirmé ; document de voyage différent de celui déclaré (à vérifier)."];
+function liveTick(){
+  const now = Date.now(), ev = []; LIVE.n++;
+  const fl = FLIGHTS.filter(f => f.pax.length && f.std > now);
+  const cand = []; fl.forEach(f => WINDOWS.forEach(w => { if (w.k !== "ferm" && f.win[w.k].st === "a_venir") cand.push([f, w]); }));
+  cand.sort((a, b) => a[0].win[a[1].k].due - b[0].win[b[1].k].due);
+  if (cand.length) { const [f, w] = cand[0]; f.win[w.k] = {st:"recu", due: f.win[w.k].due, at: now};
+    ev.push({t:"msg", txt:`${w.c === "PNR" ? "PNRGOV" : "PAXLST"} poussé par ${carName(f.carrier)} · ${f.num} · ${w.l} (en avance)`, fid:f.id, ack:`CONTRL ${pad(ri(0,99))}${pad(ri(0,99))} · accepté`}); }
+  if (LIVE.n % 2 === 0 && fl.length) { const c = LIVE_CASES[(LIVE.n / 2 - 1) % LIVE_CASES.length], f = fl[ri(0, Math.min(5, fl.length - 1))];
+    const q = makePax(f, Object.assign({}, c, {pnr: Object.assign({creation: now - ri(6, 40) * H}, c.pnr || {})})); f.pax.push(q); PAX[q.id] = q; filterSensitive(q); screenAll();
+    ev.push({t:"msg", txt:`Mise à jour PNRGOV · ${f.num} · 1 réservation ajoutée`, fid:f.id, ack:`CONTRL ${pad(ri(0,99))}${pad(ri(0,99))} · accepté`});
+    if (RES[q.id].alerte) { ev.push({t:"alerte", txt:`${q.nom} ${q.prenoms} · ${f.num} · ${RES[q.id].hits.map(h => h.id).join(", ")}`, pid:q.id}); toast(`Nouvelle alerte : ${q.nom} ${q.prenoms} (${f.num})`); audit("Alerte générée par le flux", `${q.nom} ${q.prenoms} · ${f.num}`); } }
+  COOP.out.filter(o => o.statut === "En attente" && now - o.at > 15000).forEach(o => { o.statut = "Réponse reçue"; o.reponse = COOP_REP[hashN(o.id) % COOP_REP.length]; o.hist.unshift({at: now, action: "Réponse reçue", detail: o.reponse});
+    ev.push({t:"coop", txt:`${o.vers} a répondu à ${o.id}`}); audit("Réponse d'une UIP partenaire", `${o.id} · ${o.vers}`); });
+  ev.reverse().forEach(e => LIVE.feed.unshift(Object.assign({at: now}, e))); LIVE.feed.splice(40);
+  softRender();
+}
+function softRender(){ const h = location.hash.slice(1), route = VIEWS[h] ? h : "veille", a = document.activeElement;
+  const busy = a && /INPUT|TEXTAREA|SELECT/.test(a.tagName) && $("#view").contains(a);
+  if (!busy && ["veille","vols","alertes","statistiques","cooperation"].includes(route)) { const y = window.scrollY; render(); window.scrollTo(0, y); } else cntAlert(); }
+setInterval(() => { if (LIVE.on && !document.hidden) liveTick(); }, 30000);
+
+/* ---------- Coopération internationale (simulation) ---------- */
+const PARTNERS = ["UIP Côte d'Ivoire","UIP Mali","UIP Niger","UIP Sénégal","UIP Ghana","UIP Togo","UIP France"];
+const COOP = {in: [
+  {id:"CI-2026-014", de:"UIP Côte d'Ivoire", at:NOW0 - 5*H, objet:"Déplacements de KAPRISSO Daniel (notice rouge A-1187/3-2025) sur 30 jours", finalite:"Criminalité grave : recherche en vue d'extradition", indiv:true, statut:"À instruire", hist:[]},
+  {id:"ML-2026-031", de:"UIP Mali", at:NOW0 - 26*H, objet:"Liste de tous les passagers BKO → OUA ayant payé en espèces la semaine dernière", finalite:"Analyse générale, sans personne ni affaire désignée", indiv:false, statut:"À instruire", hist:[]},
+  {id:"SN-2026-007", de:"UIP Sénégal", at:NOW0 - 3*DAY, objet:"Confirmation du voyage de NARGUELE Fatim", finalite:"Prévention du terrorisme · diffusion D-5531/2026", indiv:true, statut:"Accordée", hist:[{at:NOW0 - 2*DAY, action:"Accordée", detail:"Voyage confirmé, données limitées à l'identité et au vol.", qui:"Superviseur de quart"}]}
+], out: []};
+const coopOpen = () => COOP.in.filter(o => o.statut === "À instruire").length;
+function openCoop(key){
+  const [dir, id] = key.split(":"), o = (dir === "in" ? COOP.in : COOP.out).find(x => x.id === id); if (!o) return;
+  const dlg = $("#dlg"); dlg.dataset.pax = ""; dlg.dataset.doss = ""; dlg.dataset.coopkey = key;
+  audit("Consultation d'une demande de coopération", o.id);
+  const q = o.pax && PAX[o.pax];
+  dlg.innerHTML = `<div class="mh"><div><span class="lbl">Coopération internationale · ${dir === "in" ? "demande reçue" : "demande envoyée"}</span><h2 style="font-size:1.3rem">${esc(o.id)} · ${esc(dir === "in" ? o.de : o.vers)}</h2></div><button class="btn" type="button" data-dclose>Fermer</button></div>
+    <div class="mb">
+      <dl class="kv"><dt>Objet</dt><dd>${esc(o.objet)}</dd><dt>Finalité</dt><dd>${esc(o.finalite)}</dd>${o.ref ? `<dt>Référence</dt><dd>${esc(o.ref)}</dd>` : ""}<dt>Date</dt><dd>${dmy(o.at)} ${hm(o.at)}</dd><dt>Statut</dt><dd>${esc(o.statut)}</dd>${o.reponse ? `<dt>Réponse</dt><dd>${esc(o.reponse)}</dd>` : ""}</dl>
+      ${q ? `<div class="hit" style="cursor:pointer" data-plink="${q.id}">${scoreTag(RES[q.id].score)}<div><b>${esc(q.nom)} ${esc(q.prenoms)}</b><p>Voir la fiche du voyageur</p></div></div>` : ""}
+      ${dir === "in" && o.statut === "À instruire" ? (canSup() ? `<div class="card"><header><h3>Instruction</h3></header>
+        <label class="switch"><input type="checkbox" id="cp-1"> Finalité conforme au décret (terrorisme, criminalité grave)</label>
+        <label class="switch"><input type="checkbox" id="cp-2"> Demande individualisée (personne ou affaire désignée, pas de transfert massif)</label>
+        <label class="switch"><input type="checkbox" id="cp-3"> Accord de coopération ou garanties de protection des données suffisantes</label>
+        <label class="field" for="a-motif" style="margin-top:10px">Motif de la décision (obligatoire)<input id="a-motif" type="text" placeholder="Ex. données limitées au vol et à l'identité"></label>
+        <div class="row" style="margin-top:12px"><button class="btn pri" type="button" data-cpdec="Accordée">Accorder</button><button class="btn ghost" type="button" data-cpdec="Refusée">Refuser</button></div></div>`
+        : '<div class="msg m-amber">L\'instruction des demandes étrangères revient au superviseur. Changez de profil dans le bandeau pour essayer.</div>') : ""}
+      ${o.hist.length ? `<div class="card"><header><h3>Historique</h3></header>${o.hist.map(h => `<div class="hit" style="grid-template-columns:auto minmax(0,1fr)"><span class="mono note">${dShort(h.at)} ${hm(h.at)}</span><div><b>${esc(h.action)}</b><p>${esc(h.detail)}${h.qui ? " · " + esc(h.qui) : ""}</p></div></div>`).join("")}</div>` : ""}
+    </div>`;
+  if (!dlg.open) dlg.showModal();
+}
+function coopDecide(dec){
+  const key = $("#dlg").dataset.coopkey, id = key.split(":")[1], o = COOP.in.find(x => x.id === id); const motif = $("#a-motif").value.trim();
+  if (motif.length < 5) { toast("Indiquez le motif de la décision."); $("#a-motif").focus(); return; }
+  if (dec === "Accordée" && !["cp-1","cp-2","cp-3"].every(i => $("#" + i).checked)) { toast("Les trois conditions doivent être remplies pour accorder la demande."); return; }
+  o.statut = dec; o.hist.unshift({at: Date.now(), action: dec, detail: motif, qui: ROLE_LABEL[ROLE]});
+  audit(`Demande de coopération ${dec.toLowerCase()}`, `${o.id} · ${o.de}`); toast(`Demande ${o.id} ${dec.toLowerCase()}.`); openCoop(key); render();
+}
+function openCoopAsk(pid){
+  const p = PAX[pid], dlg = $("#dlg"); dlg.dataset.pax = ""; dlg.dataset.ask = pid;
+  dlg.innerHTML = `<div class="mh"><div><span class="lbl">Demande à une UIP partenaire</span><h2 style="font-size:1.3rem">${esc(p.nom)} ${esc(p.prenoms)}</h2></div><button class="btn" type="button" data-dclose>Fermer</button></div>
+    <div class="mb"><div class="grid h2">
+      <label class="field" for="cq-to">UIP destinataire<select id="cq-to">${PARTNERS.map(x => `<option>${esc(x)}</option>`).join("")}</select></label>
+      <label class="field" for="cq-fin">Finalité<select id="cq-fin"><option>Prévention d'une infraction terroriste</option><option>Enquête sur une forme de criminalité grave</option></select></label>
+      <label class="field" for="cq-obj" style="grid-column:1/-1">Question posée<input id="cq-obj" type="text" value="Antécédents de voyage et signalements éventuels"></label>
+      <label class="field" for="cq-ref" style="grid-column:1/-1">Référence de la procédure (obligatoire)<input id="cq-ref" type="text" placeholder="Ex. dossier DOS-2026-001"></label></div>
+      <p class="note" style="margin:0">Seules l'identité et les données du vol concerné sont communiquées. L'envoi est inscrit au journal d'audit.</p>
+      <div class="row"><button class="btn pri" type="button" id="cq-send">Envoyer la demande</button><button class="btn ghost" type="button" data-plink="${p.id}">Retour à la fiche</button></div></div>`;
+  if (!dlg.open) dlg.showModal();
+}
+function coopSend(){
+  const pid = $("#dlg").dataset.ask, p = PAX[pid], ref = $("#cq-ref").value.trim();
+  if (ref.length < 4) { toast("La référence de la procédure est obligatoire."); $("#cq-ref").focus(); return; }
+  const o = {id: `BF-2026-${String(41 + COOP.out.length).padStart(3, "0")}`, vers: $("#cq-to").value, pax: pid, objet: `${p.nom} ${p.prenoms} : ${$("#cq-obj").value.trim()}`, finalite: $("#cq-fin").value, ref, at: Date.now(), statut: "En attente", hist: [{at: Date.now(), action: "Demande envoyée", detail: ref, qui: ROLE_LABEL[ROLE]}]};
+  COOP.out.unshift(o); audit("Demande envoyée à une UIP partenaire", `${o.id} · ${o.vers} · ${p.nom}`);
+  LIVE.feed.unshift({at: Date.now(), t: "coop", txt: `Demande ${o.id} envoyée à ${o.vers}`}); toast(`Demande ${o.id} envoyée. Réponse simulée sous peu.`); openPax(pid); render();
+}
+
+/* ---------- Scénarios : formulaire ---------- */
+function scRow(i, c){ c = c || {champ:"", val:""}; const F = SCEN_FIELDS[c.champ];
+  const ctl = !F ? `<input id="sc-v${i}" type="text" disabled placeholder="Choisissez un critère">` : F.t === "sel" ? `<select id="sc-v${i}">${F.o.map(o => `<option ${o === c.val ? "selected" : ""}>${esc(o)}</option>`).join("")}</select>` : `<input id="sc-v${i}" type="${F.t === "num" ? "number" : "text"}" min="0" value="${esc(c.val)}" placeholder="${esc(F.ph || "")}">`;
+  return `<div class="cond" id="sc-r${i}"><label class="field" for="sc-f${i}">Critère ${i + 1}<select id="sc-f${i}" data-scf="${i}"><option value="">—</option>${Object.entries(SCEN_FIELDS).map(([k, v]) => `<option value="${k}" ${k === c.champ ? "selected" : ""}>${esc(v.l)}</option>`).join("")}</select></label><label class="field" for="sc-v${i}">Valeur${ctl}</label></div>`; }
+function openScenForm(){
+  const dlg = $("#dlg"); dlg.dataset.pax = ""; dlg.dataset.doss = "";
+  dlg.innerHTML = `<div class="mh"><div><span class="lbl">Règles de ciblage</span><h2>Nouveau scénario</h2></div><button class="btn" type="button" data-dclose>Fermer</button></div>
+    <div class="mb"><div class="grid h2"><label class="field" for="sc-nom">Intitulé<input id="sc-nom" type="text" placeholder="Ex. Aller simple tardif sans bagage"></label><label class="field" for="sc-poids">Poids (points)<input id="sc-poids" type="number" min="5" max="60" step="5" value="25"></label></div>
+      ${[0,1,2].map(i => scRow(i, i === 0 ? {champ:"trajet", val:"Aller simple"} : i === 1 ? {champ:"delai", val:"48"} : null)).join("")}
+      <p class="note" style="margin:0">Au moins deux critères. Poids limité à 60 points : un scénario seul ne déclenche pas d'alerte automatique au-delà du seuil sans un autre indice.</p>
+      <div id="sc-out"></div>
+      <div class="row"><button class="btn" type="button" id="sc-test">Tester sur les vols en cours</button><button class="btn pri" type="button" id="sc-save">${canSup() ? "Enregistrer (validation par un autre profil)" : "Proposer au superviseur"}</button></div></div>`;
+  if (!dlg.open) dlg.showModal();
+}
+function scRead(){ return [0,1,2].map(i => ({champ: $("#sc-f" + i).value, val: ($("#sc-v" + i).value || "").trim()})).filter(c => c.champ && c.val !== ""); }
+function scTest(conds){ return Object.values(PAX).filter(p => p.statut === "Passager" && conds.every(c => condOk(c, p, FLIGHTS.find(f => f.id === p.vol)))); }
+function scSave(){
+  const nom = $("#sc-nom").value.trim(), poids = Math.max(5, Math.min(60, +$("#sc-poids").value || 25)), conds = scRead();
+  if (nom.length < 3) { toast("Donnez un intitulé au scénario."); return; }
+  if (conds.length < 2) { toast("Un scénario doit combiner au moins deux critères (art. 13)."); return; }
+  const x = {id: "S" + (Math.max(0, ...SCEN.map(y => +y.id.slice(1))) + 1), nom, poids, actif: true, statut: "À valider", parRole: ROLE, par: ROLE_LABEL[ROLE], at: Date.now(), revue: Date.now() + 182*DAY, conds};
+  SCEN.push(x); audit("Proposition d'un scénario de ciblage", `${x.id} · ${x.nom}`); $("#dlg").close(); render(); toast(`Scénario ${x.id} proposé : il sera actif après validation.`);
+}
+
+/* ---------- Recherche rapide (Ctrl + K) ---------- */
+const PAGES = {veille:"Salle de veille", vols:"Vols", alertes:"Alertes", ciblage:"Règles de ciblage", listes:"Listes de surveillance", dossiers:"Dossiers d'enquête", reception:"Réception API / PNR", recherche:"Recherche nominative (motif obligatoire)", interconnexions:"Interconnexions", cooperation:"Coopération internationale", statistiques:"Statistiques", transporteurs:"Transporteurs", protection:"Protection des données", apropos:"Architecture"};
+function qkResults(q){ q = norm(q); const out = [];
+  Object.entries(PAGES).forEach(([k, l]) => { if (!q || norm(l).includes(q)) out.push({l, s:"Page", a:"page:" + k}); });
+  if (q) { FLIGHTS.filter(f => norm(f.num + " " + f.origine + " " + f.dest + " " + (APT[f.origine] || "") + " " + (APT[f.dest] || "") + " " + carName(f.carrier)).includes(q)).slice(0, 6).forEach(f => out.push({l: fLabel(f), s: `Vol · ${dShort(fTime(f))} ${hm(fTime(f))}`, a: "flight:" + f.id}));
+    alerts().filter(a => norm(a.p.nom + " " + a.p.prenoms).includes(q)).slice(0, 6).forEach(a => out.push({l: `${a.p.nom} ${a.p.prenoms}`, s: `Alerte · score ${a.r.score}`, a: "pax:" + a.p.id}));
+    DOSS.filter(d => norm(d.id + " " + d.titre).includes(q)).forEach(d => out.push({l: `${d.id} · ${d.titre}`, s: "Dossier", a: "doss:" + d.id})); }
+  return out.slice(0, 14); }
+function qkList(q){ const r = qkResults(q); return r.map(x => `<button class="qk-r" type="button" data-qk="${esc(x.a)}"><b>${esc(x.l)}</b><span>${esc(x.s)}</span></button>`).join("") + `<p class="note" style="margin:8px 12px">Seuls les voyageurs en alerte apparaissent ici. Pour tout autre voyageur, utilisez la Recherche nominative avec un motif (art. 14).</p>`; }
+function openQk(){ const d = $("#qk"); d.innerHTML = `<input id="qk-in" type="search" placeholder="Vol, ville, voyageur en alerte, dossier, page…" aria-label="Recherche rapide" autocomplete="off"><div class="qk-l" id="qk-list">${qkList("")}</div>`; if (!d.open) d.showModal(); $("#qk-in").focus(); }
+function qkGo(a){ const [k, v] = [a.slice(0, a.indexOf(":")), a.slice(a.indexOf(":") + 1)]; $("#qk").close();
+  if (k === "page") location.hash = v; else if (k === "flight") openFlight(v); else if (k === "pax") openPax(v); else if (k === "doss") openDossier(v); }
+
+/* ---------- Export CSV et impression ---------- */
+function dlCsv(name, rows){
+  const csv = rows.map(r => r.map(v => `"${String(v ?? "").replace(/"/g, '""')}"`).join(";")).join("\r\n");
+  try { const url = URL.createObjectURL(new Blob(["﻿" + csv], {type: "text/csv;charset=utf-8"})); const a = document.createElement("a"); a.href = url; a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1500); toast(`Fichier ${name} préparé.`); }
+  catch (e) { toast("Téléchargement impossible dans cet affichage."); }
+}
+function applyTheme(t){ if (t) document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme; }
+try { applyTheme(localStorage.getItem("uip-theme")); } catch (e) {}
+
 function connTest(id, why){
   const c = CONNECTORS.find(x => x.id === id);
   CONN_LOG.unshift({at: Date.now(), c: id, req: 1, hits: 0, ms: c.etat === "ok" ? Math.round(c.lat * (0.8 + rnd() * 0.5)) : null, ok: c.etat === "ok", why: why || "Test de connexion"});
@@ -1112,7 +1317,15 @@ document.addEventListener("click", e => {
   const t = e.target;
   if (t.closest("[data-close]")) { closeDrawer(); return; }
   if (t.closest("[data-dclose]")) { $("#dlg").close(); return; }
+  const qk = t.closest("[data-qk]"); if (qk) { qkGo(qk.dataset.qk); return; }
+  if (t.id === "qk" ) { $("#qk").close(); return; }
   const pl = t.closest("[data-plink]"); if (pl) { openPax(pl.dataset.plink); return; }
+  const cp = t.closest("[data-coop]"); if (cp) { openCoop(cp.dataset.coop); return; }
+  const cpd = t.closest("[data-cpdec]"); if (cpd) { coopDecide(cpd.dataset.cpdec); return; }
+  const xf = t.closest("[data-expflight]"); if (xf) { const f = FLIGHTS.find(x => x.id === xf.dataset.expflight); audit("Export du manifeste", fLabel(f));
+    dlCsv(`manifeste-${f.num.replace(" ", "")}-${iso(f.std)}.csv`, [["Nom","Prénoms","Statut","Sexe","Naissance","Nationalité","Document","Émetteur","Expiration","Siège","PNR","Score","Règles"]].concat(f.pax.map(p => [p.nom, p.prenoms, p.statut, p.sexe, p.ddn, p.nat, p.doc.num, p.doc.emet, p.doc.exp, p.siege, p.pnr.loc, RES[p.id].score, RES[p.id].hits.map(h => h.id).join(" ")]))); return; }
+  const sv = t.closest("[data-scval]"); if (sv) { const x = SCEN.find(y => y.id === sv.dataset.scval); if (!canSup() || ROLE === x.parRole) { toast("La validation revient à un autre profil habilité."); return; } x.statut = "Validé"; x.valPar = ROLE; screenAll(); audit("Validation d'un scénario de ciblage", `${x.id} · ${x.nom}`); render(); toast(`Scénario ${x.id} validé et actif.`); return; }
+  const sd = t.closest("[data-scdel]"); if (sd) { const i = SCEN.findIndex(y => y.id === sd.dataset.scdel); const x = SCEN.splice(i, 1)[0]; screenAll(); audit("Retrait d'un scénario de ciblage", `${x.id} · ${x.nom}`); render(); return; }
   const dop = t.closest("[data-dopen]"); if (dop) { e.preventDefault(); openDossier(dop.dataset.dopen); return; }
   const px = t.closest("[data-pax]"); if (px && !t.closest("dialog")) { openPax(px.dataset.pax); return; }
   const fl = t.closest("[data-flight]"); if (fl) { openFlight(fl.dataset.flight); return; }
@@ -1123,6 +1336,17 @@ document.addEventListener("click", e => {
   const fm = t.closest("[data-fmt]"); if (fm) { if (UI.fmt !== fm.dataset.fmt) { UI.fmt = fm.dataset.fmt; UI.edi = ""; PARSED = null; render(); } return; }
   if (t.id === "sample") { UI.edi = UI.fmt === "PNRGOV" ? samplePnrgov() : samplePaxlst(); PARSED = null; render(); return; }
   if (t.id === "parse") { UI.edi = $("#edi").value; PARSED = UI.fmt === "PNRGOV" ? parsePnrgov(UI.edi) : parsePaxlst(UI.edi); render(); return; }
+  if (t.id === "live-now") { liveTick(); return; }
+  if (t.id === "live-toggle") { LIVE.on = !LIVE.on; audit(LIVE.on ? "Reprise du flux en direct" : "Pause du flux en direct", "Salle de veille"); render(); return; }
+  if (t.id === "qkbtn") { openQk(); return; }
+  if (t.id === "themebtn") { const cur = document.documentElement.dataset.theme || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark"); const nt = cur === "light" ? "dark" : "light"; applyTheme(nt); try { localStorage.setItem("uip-theme", nt); } catch (err) {} return; }
+  if (t.id === "exp-alertes") { audit("Export de la liste des alertes", `${alerts().length} alerte(s)`); dlCsv(`alertes-uip-${iso(Date.now())}.csv`, [["Score","Nom","Prénoms","Naissance","Vol","Date","Règles","Statut","Service"]].concat(alerts().map(a => [a.r.score, a.p.nom, a.p.prenoms, a.p.ddn, a.f.num, `${dmy(fTime(a.f))} ${hm(fTime(a.f))}`, a.r.hits.map(h => h.id).join(" "), a.s.statut, a.s.service || ""]))); return; }
+  if (t.id === "printfiche") { const p = PAX[$("#dlg").dataset.pax]; audit("Impression d'une fiche passager", p ? `${p.nom} ${p.prenoms}` : "—"); $("#printarea").innerHTML = `<p style="font-weight:700;margin:0 0 8px">UIP Burkina · document à diffusion restreinte · imprimé le ${dmy(Date.now())} à ${hm(Date.now())} GMT · ${esc(ROLE_LABEL[ROLE])}</p>` + $("#dlg").innerHTML; window.print(); return; }
+  if (t.id === "coop-ask") { openCoopAsk($("#dlg").dataset.pax); return; }
+  if (t.id === "cq-send") { coopSend(); return; }
+  if (t.id === "newscen") { openScenForm(); return; }
+  if (t.id === "sc-test") { const c = scRead(); const n = c.length < 2 ? null : scTest(c).length; $("#sc-out").innerHTML = n === null ? '<div class="msg m-amber">Choisissez au moins deux critères.</div>' : `<div class="msg ${n / Object.keys(PAX).length > .05 ? "m-amber" : "m-green"}">${n} passager(s) concerné(s) sur ${Object.keys(PAX).length} (${(n / Object.keys(PAX).length * 100).toFixed(1)} %).${n / Object.keys(PAX).length > .05 ? " Scénario trop large : il produirait beaucoup de faux positifs." : ""}</div>`; return; }
+  if (t.id === "sc-save") { scSave(); return; }
   if (t.id === "resetdemo") { if (confirm("Effacer les décisions, dossiers et réglages enregistrés dans ce navigateur ?")) { try { localStorage.removeItem(STORE); } catch (err) {} location.hash = ""; location.reload(); } return; }
   if (t.id === "newdoss") { const d = {id: `DOS-2026-${pad(DOSS.length + 1).padStart(3, "0")}`, titre: "Nouveau dossier", statut: "Ouvert", ref: "À compléter", pax: [], notes: [], at: Date.now()}; DOSS.unshift(d); audit("Ouverture d'un dossier d'enquête", d.id); render(); openDossier(d.id); return; }
   if (t.id === "d-add" || t.id === "d-addlinks") { const pid = $("#dlg").dataset.pax, p = PAX[pid]; let v = $("#d-sel").value, d;
@@ -1144,6 +1368,7 @@ document.addEventListener("click", e => {
 });
 document.addEventListener("input", e => {
   const t = e.target;
+  if (t.id === "qk-in") { $("#qk-list").innerHTML = qkList(t.value); return; }
   if (t.id === "f-q") { UI.q = t.value; render(); }
   else if (t.id === "edi") UI.edi = t.value;
   else if (t.id === "thr") { THRESHOLD = +t.value; screenAll(); render(); }
@@ -1157,10 +1382,14 @@ document.addEventListener("change", e => {
   else if (t.dataset.rule) { const r = RULES.find(x => x.id === t.dataset.rule); r.actif = t.checked; screenAll(); audit(t.checked ? "Activation d'une règle" : "Désactivation d'une règle", `${r.id} · ${r.nom}`); render(); }
   else if (t.dataset.poids) { const r = RULES.find(x => x.id === t.dataset.poids); r.poids = Math.max(0, Math.min(100, +t.value || 0)); screenAll(); audit("Modification du poids d'une règle", `${r.id} : ${r.poids}`); render(); }
   else if (t.id === "depers") openPax($("#dlg").dataset.pax, t.checked);
+  else if (t.dataset.scf !== undefined) { const i = +t.dataset.scf; $("#sc-r" + i).outerHTML = scRow(i, {champ: t.value, val: ""}); }
+  else if (t.dataset.scen) { const x = SCEN.find(y => y.id === t.dataset.scen); x.actif = t.checked; screenAll(); audit(t.checked ? "Activation d'un scénario" : "Désactivation d'un scénario", `${x.id} · ${x.nom}`); render(); }
   else if (t.id === "role") { ROLE = t.value; audit("Changement de profil (démonstration)", ROLE_LABEL[ROLE]); const dlg = $("#dlg"); if (dlg.open) { if (dlg.dataset.pax) openPax(dlg.dataset.pax); else if (dlg.dataset.doss) openDossier(dlg.dataset.doss); } render(); toast("Profil : " + ROLE_LABEL[ROLE]); }
   else if (t.id === "d-title" || t.id === "d-stat" || t.id === "d-ref") { const d = DOSS.find(x => x.id === $("#dlg").dataset.doss); if (!d) return; const k = {"d-title":"titre","d-stat":"statut","d-ref":"ref"}[t.id]; d[k] = t.value.trim() || d[k]; d.at = Date.now(); audit("Modification d'un dossier", `${d.id} · ${k}`); render(); }
 });
-document.addEventListener("keydown", e => { if (e.key === "Escape" && $("#drawerhost").innerHTML && !$("#dlg").open) closeDrawer(); });
+document.addEventListener("keydown", e => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") { e.preventDefault(); openQk(); return; }
+  if (e.key === "Enter" && e.target.id === "qk-in") { const b = $("#qk-list [data-qk]"); if (b) qkGo(b.dataset.qk); return; } if (e.key === "Escape" && $("#drawerhost").innerHTML && !$("#dlg").open) closeDrawer(); });
 
 function decide(id, statut){
   if (ROLE === "DPD") { toast("Le profil DPD consulte sans décider."); return; }
@@ -1211,6 +1440,7 @@ function saveWatch(){
 }
 { const d0 = DOSS[0]; d0.pax = Object.values(PAX).filter(p => ["VELTAMBO","ZALIBOU"].includes(p.nom)).map(p => p.id); d0.notes = [{at: NOW0 - 3*H, qui: "Superviseur de quart", txt: "VELTAMBO et ZALIBOU partagent le même numéro de téléphone dans leurs réservations (exemple fictif)."}]; }
 load();
+LIVE.feed.push({at: NOW0 - 2*MIN, t:"msg", txt:"Session ouverte : écoute du guichet unique (méthode push)"});
 render();
 })();
 </script>

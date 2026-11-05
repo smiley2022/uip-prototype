@@ -5,6 +5,10 @@ Prototype de démonstration de la plateforme de l'Unité d'Information Passagers
 **Toutes les données (compagnies, passagers, listes, notices) sont fictives et générées dans le navigateur. Ne saisir aucune donnée réelle : le décret impose un hébergement sur infrastructures nationales (art. 15).**
 
 ## Modules
+- Flux en direct selon la méthode push (les transporteurs envoient, l'UIP ne va jamais chercher les données), avec accusés de réception
+- Scénarios de ciblage composés (2 critères ou plus, validation par un second profil, revue à 6 mois)
+- Coopération internationale : instruction des demandes des UIP partenaires et envoi de demandes (simulation)
+- Recherche rapide (Ctrl + K), export CSV, impression de fiche, thème clair ou sombre
 - Salle de veille : vols OUA et BOY, état des transmissions H-48, H-24, H-30 min et fermeture du vol (art. 7 et 8)
 - Vols et manifestes, fiche passager (annexes 1 et 2), aperçu dépersonnalisé (art. 19)
 - Réception et lecture de messages UN/EDIFACT PAXLST (API) et PNRGOV (PNR), avec suppression des codes religion et santé à l'intégration (art. 11)
