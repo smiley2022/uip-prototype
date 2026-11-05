@@ -251,6 +251,7 @@ pre.fiche{font-family:var(--f-mono);font-size:.78rem;background:var(--surface);b
       <a href="#vols">Vols</a>
       <a href="#carte">Carte des liaisons</a>
       <a href="#alertes">Alertes <span class="cnt" id="cnt-alertes"></span></a>
+      <a href="#services">Services destinataires</a>
       <span class="navgrp">Analyse</span>
       <a href="#ciblage">Règles de ciblage</a>
       <a href="#listes">Listes de surveillance</a>
@@ -384,6 +385,7 @@ function makePax(f, opts = {}){
   if (rnd() < .7) p.pnr.email = `${norm(p.prenoms).split(" ")[0].toLowerCase()}.${norm(p.nom).replace(/ /g,"").toLowerCase()}${ri(1,99)}@courriel.test`;
   if (opts.pnr) Object.assign(p.pnr, opts.pnr);
   if (p.pnr.paiement !== "Carte bancaire") p.pnr.carte = null;
+  p.src = {api: true, pnr: true};
   return p;
 }
 function genFlights(){
@@ -420,7 +422,7 @@ function genFlights(){
   });
   /* Cas d'école plantés dans les vols à venir ou récents (tous fictifs) */
   const withPax = FLIGHTS.filter(f => f.pax.length && f.std > NOW0 - 6*H);
-  const plant = (k, opts) => { const f = withPax[k % withPax.length]; if (!f) return; const p = makePax(f, opts); f.pax.splice(ri(0, f.pax.length), 0, p); return p; };
+  const plant = (k, opts) => { const f = withPax[k % withPax.length]; if (!f) return; const p = makePax(f, opts); p.plant = true; f.pax.splice(ri(0, f.pax.length), 0, p); return p; };
   const vel = plant(0, {nom:"VELTAMBO", prenoms:"Issaka", ddn:"1988-04-12", sexe:"M", nat:"BFA", pnr:{allerSimple:true, paiement:"Espèces", creation: withPax[0].std - 30*H, tel:"+226 76 41 08 52", email:null}});
   if (vel) { plant(0, {nom:"SANOU", prenoms:"Boukary", ddn:"1990-10-03", sexe:"M", nat:"BFA", pnr:{loc: vel.pnr.loc, allerSimple:true, paiement:"Espèces", creation: vel.pnr.creation, tel: vel.pnr.tel, email:"b.sanou77@courriel.test"}});
     plant(9, {nom:"KONATE", prenoms:"Moussa", ddn:"1986-01-22", sexe:"M", nat:"MLI", pnr:{email:"b.sanou77@courriel.test", paiement:"Carte bancaire", carte:"**** 7310"}});
@@ -433,8 +435,15 @@ function genFlights(){
   if (mm) mm.pnr.api = {nom:"TRAORE", prenoms:"Abdoulaye", ddn:"1990-07-15"};
   plant(6, {nom:"ZALIBOU", prenoms:"Moctar", ddn:"1995-02-18", sexe:"M", nat:"NER", pnr:{creation: withPax[6 % withPax.length].std - 20*H, paiement:"Espèces", allerSimple:true, tel:"+226 76 41 08 52"}});
   plant(7, {nom:"TIMBELA", prenoms:"Aïssata", ddn:"2011-03-04", sexe:"F", nat:"BFA", pnr:{agence:"Comptoir aéroport", paiement:"Espèces"}});
-  FLIGHTS.forEach(f => f.pax.forEach(p => PAX[p.id] = p));
+  FLIGHTS.forEach(f => f.pax.forEach(p => { PAX[p.id] = p;
+    if (p.statut !== "Passager") p.src = {api: true, pnr: false};
+    else if (!p.plant) { const h = hashN(p.id + "src") % 100; p.src = h < 3 ? {api: false, pnr: true} : h < 5 ? {api: true, pnr: false} : {api: true, pnr: true}; } }));
 }
+const winIn = (f, ks) => ks.some(k => f.win[k] && (f.win[k].st === "recu" || f.win[k].st === "retard"));
+const apiIn = f => winIn(f, ["api", "ferm"]);
+function rappro(f){ const pax = f.pax.filter(p => p.statut === "Passager");
+  return {both: pax.filter(p => p.src.api && p.src.pnr), pnrOnly: pax.filter(p => !p.src.api && p.src.pnr), apiOnly: pax.filter(p => p.src.api && !p.src.pnr), ecart: pax.filter(p => p.pnr.api), crew: f.pax.filter(p => p.statut !== "Passager")}; }
+const ecartsN = f => { if (!f.pax.length || !apiIn(f)) return null; const r = rappro(f); return r.pnrOnly.length + r.apiOnly.length + r.ecart.length; };
 genFlights();
 
 /* =============== Ingestion : filtre art. 11 =============== */
@@ -457,7 +466,8 @@ const RULES = [
   {id:"R7", nom:"Rupture d'itinéraire (segment ARNK)", poids:15, actif:true, base:"DDP"},
   {id:"R8", nom:"Réservation modifiée 3 fois ou plus en 24 h", poids:10, actif:true, base:"DDP"},
   {id:"R9", nom:"Concordance avec une notice ou diffusion INTERPOL", poids:90, actif:true, auto:true, base:"Notices INTERPOL (simulation)"},
-  {id:"R10", nom:"Lien avec une personne signalée (réservation, téléphone, carte ou courriel)", poids:50, actif:true, base:"Analyse des liens DDP"}
+  {id:"R10", nom:"Lien avec une personne signalée (réservation, téléphone, carte ou courriel)", poids:50, actif:true, base:"Analyse des liens DDP"},
+  {id:"R11", nom:"Embarqué sans dossier de réservation transmis (RPCV sans DDP)", poids:20, actif:true, base:"Rapprochement RPCV / DDP"}
 ];
 /* Scénarios composés par les analystes : au moins deux critères objectifs de voyage (art. 13) */
 const SCEN_FIELDS = {
@@ -511,6 +521,7 @@ function screen(p){
   if (on("R6") && p.pnr.allerSimple && p.pnr.paiement === "Espèces" && f.std - p.pnr.creation < 48*H) add("R6", `Réservé ${Math.round((f.std - p.pnr.creation)/H)} h avant le départ`);
   if (on("R7") && p.pnr.arnk) add("R7", "Segment de surface non déclaré dans l'itinéraire");
   if (on("R8") && p.pnr.modifs24h >= 3) add("R8", `${p.pnr.modifs24h} modifications en 24 h`);
+  if (on("R11") && p.statut === "Passager" && p.src && p.src.api && !p.src.pnr && apiIn(f)) add("R11", "Figure dans la liste d'embarquement (RPCV) sans dossier de réservation (DDP) transmis par le transporteur");
   SCEN.filter(x => x.actif && x.statut === "Validé").forEach(x => { if (x.conds.every(c => condOk(c, p, f))) hits.push({id:x.id, nom:"Scénario : " + x.nom, poids:x.poids, detail:x.conds.map(condTxt).join(" · "), auto:false}); });
   const score = Math.min(100, hits.reduce((s,h) => s + h.poids, 0));
   return {hits, score, alerte: score >= THRESHOLD || hits.some(h => h.auto), incomplet};
@@ -531,6 +542,8 @@ const ROLE_LABEL = {Analyste:"Analyste de permanence", Superviseur:"Superviseur 
 const canSup = () => ROLE === "Superviseur" || ROLE === "Administrateur";
 const audit = (action, objet) => AUDIT.unshift({at: Date.now(), qui: ROLE_LABEL[ROLE], action, objet});
 audit("Ouverture de session", "Poste cellule opérationnelle");
+const RETOURS = {utile: ["Personne interpellée", "Saisie (documents ou marchandises)", "Refus d'entrée sur le territoire", "Mineur pris en charge"], neutre: ["Contrôle effectué, rien à signaler", "Voyageur non présenté (vol manqué)"], faux: ["Mauvaise identification (faux positif)"]};
+const retourClass = r => RETOURS.utile.includes(r) ? "utile" : RETOURS.faux.includes(r) ? "faux" : "neutre";
 const SERVICES = ["Police aux Frontières (DGPN)","Brigade de protection des mineurs (DGPN)","BCN INTERPOL Ouagadougou","Direction Générale des Douanes","DGSI","CNSE","Gendarmerie (EMGN)","Agence de l'immigration"];
 const alerts = () => Object.values(PAX).filter(p => RES[p.id] && RES[p.id].alerte).map(p => ({p, r: RES[p.id], f: FLIGHTS.find(x => x.id === p.vol), s: ALERT[p.id] || {statut:"nouvelle"}}));
 const isOpen = st => st === "nouvelle" || st === "en_examen" || st === "a_valider";
@@ -585,7 +598,7 @@ veille(){
   </section>
   <div class="card"><header><h2><i class="pulse ${LIVE.on ? "" : "off"}"></i>Flux en direct · méthode push</h2><div class="row"><button class="btn sm" type="button" id="live-now">Simuler un envoi maintenant</button><button class="btn sm ghost" type="button" id="live-toggle">${LIVE.on ? "Mettre en pause" : "Reprendre"}</button></div></header>
     <p class="note" style="margin:0 0 8px">Les transporteurs poussent leurs messages vers le guichet unique ; l'UIP ne va jamais les chercher. Chaque message reçoit un accusé de réception, puis il est filtré et criblé. Un envoi simulé arrive toutes les 30 secondes.</p>
-    <div class="feed">${LIVE.feed.length ? LIVE.feed.slice(0, 10).map(e => `<div class="${e.fid || e.pid ? "clk" : ""}" ${e.fid ? `data-flight="${e.fid}"` : e.pid ? `data-pax="${e.pid}"` : ""}><span class="mono note">${hm(e.at)}</span><span class="tag ${e.t === "alerte" ? "t-red" : e.t === "coop" ? "t-blue" : "t-green"}">${e.t === "alerte" ? "Alerte" : e.t === "coop" ? "Coopération" : "Reçu"}</span><span>${esc(e.txt)}${e.ack ? `<span class="note"> · accusé ${esc(e.ack)}</span>` : ""}</span></div>`).join("") : '<p class="muted" style="margin:0">En attente du prochain envoi des transporteurs…</p>'}</div></div>`;
+    <div class="feed">${LIVE.feed.length ? LIVE.feed.slice(0, 10).map(e => `<div class="${e.fid || e.pid ? "clk" : ""}" ${e.fid ? `data-flight="${e.fid}"` : e.pid ? `data-pax="${e.pid}"` : ""}><span class="mono note">${hm(e.at)}</span><span class="tag ${e.t === "alerte" ? "t-red" : e.t === "coop" || e.t === "svc" ? "t-blue" : "t-green"}">${e.t === "alerte" ? "Alerte" : e.t === "coop" ? "Coopération" : e.t === "svc" ? "Service" : "Reçu"}</span><span>${esc(e.txt)}${e.ack ? `<span class="note"> · accusé ${esc(e.ack)}</span>` : ""}</span></div>`).join("") : '<p class="muted" style="margin:0">En attente du prochain envoi des transporteurs…</p>'}</div></div>`;
 },
 
 vols(){
@@ -598,9 +611,9 @@ vols(){
     <select id="f-apt" aria-label="Aéroport"><option value="">OUA et BOY</option><option ${UI.apt==="OUA"?"selected":""}>OUA</option><option ${UI.apt==="BOY"?"selected":""}>BOY</option></select>
     <select id="f-sens" aria-label="Sens"><option value="">Arrivées et départs</option><option ${UI.sens==="Arrivée"?"selected":""}>Arrivée</option><option ${UI.sens==="Départ"?"selected":""}>Départ</option></select>
   </div>
-  <div class="tw"><table class="t min"><thead><tr><th>Date / heure</th><th>Vol</th><th>Transporteur</th><th>Itinéraire</th><th>H-48 · H-24 · H-30 · Ferm.</th><th>Pax</th><th>Score max</th><th>Alertes</th></tr></thead><tbody>
+  <div class="tw"><table class="t min"><thead><tr><th>Date / heure</th><th>Vol</th><th>Transporteur</th><th>Itinéraire</th><th>H-48 · H-24 · H-30 · Ferm.</th><th>Pax</th><th>Écarts API/PNR</th><th>Score max</th><th>Alertes</th></tr></thead><tbody>
     ${list.map(f => { const sc = Math.max(0, ...f.pax.map(p => RES[p.id].score)); const na = f.pax.filter(p => RES[p.id].alerte).length;
-      return `<tr class="clk" data-flight="${f.id}"><td class="n">${dShort(fTime(f))} ${hm(fTime(f))}<div class="note">${rel(fTime(f))}</div></td><td><b>${esc(f.num)}</b><div class="note">${f.sens}</div></td><td>${esc(carName(f.carrier))}</td><td>${esc(f.origine)} → ${esc(f.dest)}<div class="note">${esc(APT[f.origine])} → ${esc(APT[f.dest])}</div></td><td>${winTags(f)}</td><td class="n">${f.pax.length || "—"}</td><td>${f.pax.length ? scoreTag(sc) : "—"}</td><td>${na ? `<span class="tag t-red">${na}</span>` : '<span class="muted">0</span>'}</td></tr>`; }).join("") || '<tr><td colspan="8" class="muted">Aucun vol ne correspond.</td></tr>'}
+      return `<tr class="clk" data-flight="${f.id}"><td class="n">${dShort(fTime(f))} ${hm(fTime(f))}<div class="note">${rel(fTime(f))}</div></td><td><b>${esc(f.num)}</b><div class="note">${f.sens}</div></td><td>${esc(carName(f.carrier))}</td><td>${esc(f.origine)} → ${esc(f.dest)}<div class="note">${esc(APT[f.origine])} → ${esc(APT[f.dest])}</div></td><td>${winTags(f)}</td><td class="n">${f.pax.length || "—"}</td><td class="n">${(() => { const n = ecartsN(f); return n === null ? '<span class="muted">—</span>' : n ? `<span class="tag t-amber">${n}</span>` : '<span class="muted">0</span>'; })()}</td><td>${f.pax.length ? scoreTag(sc) : "—"}</td><td>${na ? `<span class="tag t-red">${na}</span>` : '<span class="muted">0</span>'}</td></tr>`; }).join("") || '<tr><td colspan="9" class="muted">Aucun vol ne correspond.</td></tr>'}
   </tbody></table></div>`;
 },
 
@@ -611,7 +624,7 @@ alertes(){
     <div class="row"><button class="btn" type="button" id="exp-alertes">Exporter (CSV)</button></div></div>
   <div class="filters"><select id="f-ast" aria-label="Statut"><option value="ouvertes" ${UI.ast==="ouvertes"?"selected":""}>À traiter</option><option value="" ${!UI.ast?"selected":""}>Toutes</option><option value="a_valider" ${UI.ast==="a_valider"?"selected":""}>À valider (double regard)</option><option value="transmise" ${UI.ast==="transmise"?"selected":""}>Transmises</option><option value="ecartee" ${UI.ast==="ecartee"?"selected":""}>Écartées</option></select></div>
   <div class="tw"><table class="t min"><thead><tr><th>Score</th><th>Voyageur</th><th>Vol</th><th>Motif principal</th><th>Statut</th><th></th></tr></thead><tbody>
-  ${list.map(a => `<tr class="clk" data-pax="${a.p.id}"><td>${scoreTag(a.r.score)}</td><td><b>${esc(a.p.nom)} ${esc(a.p.prenoms)}</b><div class="note">${esc(a.p.statut)} · ${esc(a.p.nat)} · né(e) ${a.p.ddn.split("-").reverse().join("/")}</div></td><td>${esc(a.f.num)}<div class="note">${dShort(fTime(a.f))} ${hm(fTime(a.f))} · ${rel(fTime(a.f))}</div></td><td>${esc(a.r.hits[0].nom)}${a.r.hits.length > 1 ? ` <span class="note">+${a.r.hits.length - 1}</span>` : ""}</td><td>${alertTag(a.s)}${isOpen(a.s.statut) && fTime(a.f) - Date.now() < 60*MIN && fTime(a.f) > Date.now() - 30*MIN ? ' <span class="tag t-red urg" title="Vol dans moins d\'une heure">Urgent</span>' : ""}${a.s.service ? `<div class="note">${esc(a.s.service)}</div>` : ""}</td><td><button class="btn sm" type="button">Examiner</button></td></tr>`).join("") || '<tr><td colspan="6" class="muted">Aucune alerte dans cette vue.</td></tr>'}
+  ${list.map(a => `<tr class="clk" data-pax="${a.p.id}"><td>${scoreTag(a.r.score)}</td><td><b>${esc(a.p.nom)} ${esc(a.p.prenoms)}</b><div class="note">${esc(a.p.statut)} · ${esc(a.p.nat)} · né(e) ${a.p.ddn.split("-").reverse().join("/")}</div></td><td>${esc(a.f.num)}<div class="note">${dShort(fTime(a.f))} ${hm(fTime(a.f))} · ${rel(fTime(a.f))}</div></td><td>${esc(a.r.hits[0].nom)}${a.r.hits.length > 1 ? ` <span class="note">+${a.r.hits.length - 1}</span>` : ""}</td><td>${alertTag(a.s)}${isOpen(a.s.statut) && fTime(a.f) - Date.now() < 60*MIN && fTime(a.f) > Date.now() - 30*MIN ? ' <span class="tag t-red urg" title="Vol dans moins d\'une heure">Urgent</span>' : ""}${a.s.service ? `<div class="note">${esc(a.s.service)} · ${a.s.retour ? "compte rendu reçu" : a.s.lu ? "lue" : "non lue"}</div>` : ""}</td><td><button class="btn sm" type="button">Examiner</button></td></tr>`).join("") || '<tr><td colspan="6" class="muted">Aucune alerte dans cette vue.</td></tr>'}
   </tbody></table></div>`;
 },
 
@@ -766,6 +779,16 @@ portail(){
   ${PORTAL.hist.length ? `<div class="card"><header><h2>Envois de la session</h2></header><div class="tw" style="border:0"><table class="t"><thead><tr><th>Heure</th><th>Référence</th><th>Vol</th><th>Voyageurs</th><th>Environnement</th><th>Statut</th></tr></thead><tbody>${PORTAL.hist.map(h => `<tr><td class="n">${hm(h.at)}</td><td class="n">${esc(h.ref)}</td><td>${esc(h.vol)}</td><td class="n">${h.n}</td><td>${h.env === "test" ? "Test" : "Production"}</td><td>${h.ok ? '<span class="tag t-green">Accepté</span>' : '<span class="tag t-red">Rejeté</span>'}</td></tr>`).join("")}</tbody></table></div></div>` : ""}`;
 },
 
+services(){
+  const tr = alerts().filter(a => a.s.statut === "transmise"), list = tr.filter(a => a.s.service === UI.svc).sort((a, b) => b.s.at - a.s.at);
+  return `
+  <div class="head"><div><span class="lbl">Vue des services · simulation</span><h1>Services destinataires</h1><p>Ce que reçoit chaque service (police aux frontières, douane, BCN INTERPOL…) : la fiche de transmission validée, sans les autres données du voyageur. L'ouverture vaut accusé de lecture ; le service renvoie ensuite un compte rendu d'intervention, qui sert à mesurer l'efficacité des règles.</p></div></div>
+  <div class="filters"><select id="sv-sel" aria-label="Service">${SERVICES.map(x => { const n = tr.filter(a => a.s.service === x), nl = n.filter(a => !a.s.lu).length; return `<option value="${esc(x)}" ${x === UI.svc ? "selected" : ""}>${esc(x)} · ${n.length} reçue(s)${nl ? `, ${nl} non lue(s)` : ""}</option>`; }).join("")}</select></div>
+  <div class="tw"><table class="t min"><thead><tr><th>Reçue le</th><th>Voyageur</th><th>Vol</th><th>Motifs</th><th>État</th></tr></thead><tbody>
+  ${list.map(a => `<tr class="clk" data-svc="${a.p.id}"><td class="n">${dShort(a.s.at)} ${hm(a.s.at)}</td><td><b>${esc(a.p.nom)} ${esc(a.p.prenoms)}</b><div class="note">né(e) le ${a.p.ddn.split("-").reverse().join("/")} · ${esc(a.p.nat)}</div></td><td>${esc(a.f.num)}<div class="note">${dShort(fTime(a.f))} ${hm(fTime(a.f))} · ${rel(fTime(a.f))}</div></td><td>${esc(a.r.hits.map(h => h.id).join(", "))}</td><td>${a.s.retour ? `<span class="tag ${retourClass(a.s.retour.res) === "utile" ? "t-green" : retourClass(a.s.retour.res) === "faux" ? "t-grey" : "t-blue"}">${esc(a.s.retour.res)}</span>` : a.s.lu ? '<span class="tag t-amber">Lue · compte rendu attendu</span>' : '<span class="tag t-red">Non lue</span>'}</td></tr>`).join("") || '<tr><td colspan="5" class="muted">Aucune alerte reçue par ce service. Les alertes y arrivent après validation de la transmission par un superviseur.</td></tr>'}
+  </tbody></table></div>`;
+},
+
 carte(){
   const now = Date.now(), fl = FLIGHTS.filter(f => fTime(f) > now - 6*H && fTime(f) < now + 72*H);
   const R = {}; fl.forEach(f => { const o = f.sens === "Arrivée" ? f.origine : f.dest, k = o + "|" + f.local; const r = R[k] || (R[k] = {o, l: f.local, vols: 0, pax: 0, al: 0, arr: 0, dep: 0});
@@ -836,6 +859,14 @@ statistiques(){
     <div class="card"><header><h2>Traitement des alertes</h2></header>${bars(st, Math.max(1, ...st.map(x => x[1])), "var(--amber)")}
       <h3 style="margin:16px 0 8px">Transmissions par service</h3>${Object.keys(svc).length ? bars(Object.entries(svc), Math.max(...Object.values(svc)), "var(--red)") : '<p class="muted" style="margin:0">Aucune transmission validée pour l\'instant.</p>'}</div>
   </section>
+  <div class="card"><header><h2>Efficacité des règles et scénarios</h2><span class="note">d'après les décisions des analystes et les comptes rendus des services</span></header>
+    <div class="tw" style="border:0"><table class="t min"><thead><tr><th>Règle</th><th>Alertes</th><th>Transmises</th><th>Résultats utiles</th><th>Sans suite</th><th>Faux positifs</th><th>Taux de succès</th><th>Avis pour la revue</th></tr></thead><tbody>
+    ${RULES.concat(SCEN).map(r => { const as = al.filter(a => a.r.hits.some(h => h.id === r.id)); if (!as.length) return ""; const tq = as.filter(a => a.s.statut === "transmise"), rc = c => tq.filter(a => a.s.retour && retourClass(a.s.retour.res) === c).length;
+      const ut = rc("utile"), ne = rc("neutre"), fx = as.filter(a => a.s.statut === "ecartee").length + rc("faux"), tx = ut + fx ? Math.round(ut / (ut + fx) * 100) : null;
+      const avis = tx === null ? '<span class="tag t-grey">Données insuffisantes</span>' : fx >= 2 && tx < 34 ? '<span class="tag t-red">À revoir</span>' : tx >= 50 ? '<span class="tag t-green">Efficace</span>' : '<span class="tag t-amber">À surveiller</span>';
+      return `<tr><td><b>${r.id}</b> · ${esc(r.nom)}</td><td class="n">${as.length}</td><td class="n">${tq.length}</td><td class="n">${ut}</td><td class="n">${ne}</td><td class="n">${fx}</td><td class="n">${tx === null ? "—" : tx + " %"}</td><td>${avis}</td></tr>`; }).join("")}
+    </tbody></table></div>
+    <p class="note" style="margin:8px 0 0">Résultat utile : interpellation, saisie, refus d'entrée ou mineur pris en charge. Faux positif : alerte écartée par l'analyste ou mauvaise identification signalée par le service. Ce tableau prépare la revue semestrielle des règles.</p></div>
   <section class="grid c2">
     <div class="card"><header><h2>Conformité des transporteurs</h2><span class="note">envois à l'heure</span></header>${bars(cs.map(s => [s.c.nom, s.taux]), 100, v => v >= 95 ? "var(--green)" : v >= 80 ? "var(--amber)" : "var(--red)")}</div>
     <div class="card"><header><h2>Passagers par jour</h2></header>${bars(Object.entries(days).sort().map(([k, v]) => [new Date(k).toLocaleDateString("fr-FR", {weekday:"short", day:"2-digit", month:"short", timeZone:"UTC"}), v]), Math.max(1, ...Object.values(days)), "var(--blue)")}</div>
@@ -853,6 +884,8 @@ apropos(){
     <tr><td><b>Alertes</b></td><td>Transmission aux autorités compétentes</td><td>Décision motivée, choix du service</td><td>Diffusion sécurisée aux postes PAF et douane d'OUA et BOY, permanence 24/7</td></tr>
     <tr><td><b>Conservation</b></td><td>5 ans, dépersonnalisation à 6 mois (art. 19)</td><td>Politique affichée, aperçu dépersonnalisé</td><td>Tâches planifiées de masquage et de purge, réidentification sous contrôle du DPD</td></tr>
     <tr><td><b>Habilitations</b></td><td>Accès limité aux agents habilités, contrôle du DPD (art. 12 et 14)</td><td>4 profils simulés, double regard sur chaque transmission</td><td>Comptes nominatifs, authentification forte, annuaire de l'État, revue périodique des droits</td></tr>
+    <tr><td><b>Rapprochement</b></td><td>Cohérence des RPCV et des DDP</td><td>Par vol : concordants, réservés non embarqués, embarqués sans réservation, écarts d'identité ; règle R11</td><td>Rapprochement automatique à chaque envoi, signalement au transporteur des écarts récurrents</td></tr>
+    <tr><td><b>Retour des services</b></td><td>Suivi des transmissions</td><td>Boîte par service, accusé de lecture, compte rendu, efficacité des règles</td><td>Messagerie sécurisée inter-services, comptes nominatifs par poste</td></tr>
     <tr><td><b>Portail transporteurs</b></td><td>Envoi par les compagnies sans système connecté, tests préalables</td><td>Saisie manuelle ou dépôt de fichier, environnement de test, accusé de réception</td><td>Comptes par compagnie, authentification forte, certificats, campagne de certification avant l'entrée en vigueur</td></tr>
     <tr><td><b>Visualisation</b></td><td>Appui à l'analyse</td><td>Carte schématique des liaisons, graphe des liens, visite guidée</td><td>Fond cartographique hébergé localement, couches par aéroport et par période</td></tr>
     <tr><td><b>Méthode push</b></td><td>Envoi par les transporteurs, jamais d'accès de l'UIP à leurs systèmes (art. 7 à 9)</td><td>Flux en direct simulé, accusés de réception</td><td>Messagerie sécurisée, accusés CONTRL, reprise automatique des envois en échec</td></tr>
@@ -1037,7 +1070,7 @@ function ingest(r, src){
     const ex = f.pax.find(p => norm(p.nom) === norm(x.nom) && (p.ddn === x.ddn || (!x.ddn && norm(p.prenoms) === norm(x.prenoms))));
     const p = ex || makePax(f, {nom: x.nom, prenoms: x.prenoms.charAt(0) + x.prenoms.slice(1).toLowerCase(), sexe: x.sexe, ddn: x.ddn || "1900-01-01", nat: x.nat, statut: x.statut,
       doc: {type: x.doc.type || "P", num: x.doc.num || "", emet: x.doc.emet || x.nat, exp: x.doc.exp || ""}});
-    if (!ex) { if (!pn) p.pnr.ssr = ["DOCS"]; f.pax.push(p); PAX[p.id] = p; }
+    if (!ex) { if (!pn) p.pnr.ssr = ["DOCS"]; p.src = {api: !pn, pnr: pn}; f.pax.push(p); PAX[p.id] = p; } else p.src[pn ? "pnr" : "api"] = true;
     if (pn) { const keep = p.pnr.api; Object.entries(x.pnr).forEach(([k, val]) => { if (val != null && k !== "ssr") p.pnr[k] = val; }); p.pnr.ssr = Array.from(new Set(p.pnr.ssr.concat(x.pnr.ssr))); p.pnr.api = keep; filterSensitive(p); }
   });
   screenAll(pn ? "Réception PNRGOV" : "Réception PAXLST");
@@ -1060,11 +1093,21 @@ function openFlight(id){
       <div class="row"><button class="btn" type="button" data-expflight="${f.id}" ${f.pax.length ? "" : "disabled"}>Exporter le manifeste</button><button class="btn" type="button" data-close>Fermer</button></div></div>
     <div class="db">
       <div class="tline">${WINDOWS.map(w => { const x = f.win[w.k]; return `<div class="tl"><span class="lbl">${esc(w.l)} · ${w.art}</span><span class="w"><span class="win"><i class="w-${x.st}">${w.c}</i></span> ${x.st === "recu" ? "Reçu" : x.st === "retard" ? "En retard" : x.st === "manquant" ? "Non reçu" : "À venir"}</span><small>Échéance ${dShort(x.due)} ${hm(x.due)}${x.at ? ` · reçu ${hm(x.at)}` : ""}${x.ret ? ` (+${x.ret} min)` : ""}</small></div>`; }).join("")}</div>
-      ${f.pax.length ? `<div class="tw"><table class="t min"><thead><tr><th>Score</th><th>Nom</th><th>Statut</th><th>Nat.</th><th>Naissance</th><th>Document</th><th>Siège</th><th>Motifs</th></tr></thead><tbody>
-      ${rows.map(p => { const r = RES[p.id]; return `<tr class="clk" data-pax="${p.id}"><td>${scoreTag(r.score)}</td><td><b>${esc(p.nom)}</b> ${esc(p.prenoms)}</td><td>${esc(p.statut)}</td><td>${esc(p.nat)}</td><td class="n">${p.ddn.split("-").reverse().join("/")}</td><td class="n">${esc(p.doc.num)}</td><td class="n">${esc(p.siege)}</td><td>${r.hits.map(h => `<span class="tag ${h.poids >= 50 ? "t-red" : "t-amber"}" title="${esc(h.nom)}">${h.id}</span>`).join(" ")}</td></tr>`; }).join("")}
+      ${rapproView(f)}
+      ${f.pax.length ? `<div class="tw"><table class="t min"><thead><tr><th>Score</th><th>Nom</th><th>Statut</th><th>Sources</th><th>Nat.</th><th>Naissance</th><th>Document</th><th>Siège</th><th>Motifs</th></tr></thead><tbody>
+      ${rows.map(p => { const r = RES[p.id]; return `<tr class="clk" data-pax="${p.id}"><td>${scoreTag(r.score)}</td><td><b>${esc(p.nom)}</b> ${esc(p.prenoms)}</td><td>${esc(p.statut)}</td><td>${p.src.api ? '<span class="tag t-grey">API</span> ' : ""}${p.src.pnr ? '<span class="tag t-grey">PNR</span>' : ""}</td><td>${esc(p.nat)}</td><td class="n">${p.ddn.split("-").reverse().join("/")}</td><td class="n">${esc(p.doc.num)}</td><td class="n">${esc(p.siege)}</td><td>${r.hits.map(h => `<span class="tag ${h.poids >= 50 ? "t-red" : "t-amber"}" title="${esc(h.nom)}">${h.id}</span>`).join(" ")}</td></tr>`; }).join("")}
       </tbody></table></div>` : '<div class="msg m-amber">Aucune donnée reçue pour ce vol : aucune transmission du transporteur à ce jour.</div>'}
     </div></aside>`;
   document.body.style.overflow = "hidden";
+}
+function rapproView(f){
+  if (!f.pax.length) return "";
+  if (!apiIn(f)) return `<div class="msg m-amber">Rapprochement API / PNR disponible après réception des RPCV (H-30 min, échéance ${dShort(f.win.api.due)} ${hm(f.win.api.due)}). Pour l'instant, seules les réservations (DDP) sont connues.</div>`;
+  const r = rappro(f), box = (l, n, note, warn) => `<div class="tl"><span class="lbl">${l}</span><span class="w" style="font-size:1.35rem;font-family:var(--f-display);${warn && n ? "color:var(--amber)" : ""}">${n}</span><small>${note}</small></div>`;
+  const anomalies = [].concat(r.pnrOnly.map(p => [p, "Réservé, non embarqué", "PNR sans API : passager absent ou enregistré sous une autre identité"]), r.apiOnly.map(p => [p, "Embarqué sans réservation", "API sans PNR : billet émis au comptoir, ou dossier non transmis"]), r.ecart.map(p => [p, "Écart d'identité", `PNR : ${p.pnr.api.nom} ${p.pnr.api.prenoms}, ${p.pnr.api.ddn.split("-").reverse().join("/")}`]));
+  return `<div class="card"><header><h3>Rapprochement API / PNR</h3><span class="note">${r.both.length + r.pnrOnly.length + r.apiOnly.length} passagers · ${r.crew.length} membres d'équipage (API seulement, normal)</span></header>
+    <div class="tline">${box("Concordants", r.both.length, "présents dans les deux listes")}${box("Réservés non embarqués", r.pnrOnly.length, "PNR sans API", true)}${box("Embarqués sans réservation", r.apiOnly.length, "API sans PNR", true)}${box("Écarts d'identité", r.ecart.length, "nom ou date différents", true)}</div>
+    ${anomalies.length ? anomalies.map(([p, t, d]) => `<div class="hit" style="cursor:pointer" data-pax="${p.id}">${scoreTag(RES[p.id].score)}<div><b>${esc(p.nom)} ${esc(p.prenoms)}</b><p>${esc(d)}</p></div><span class="tag t-amber">${esc(t)}</span></div>`).join("") : '<p class="note" style="margin:8px 0 0">Les deux listes concordent.</p>'}</div>`;
 }
 function closeDrawer(){ $("#drawerhost").innerHTML = ""; document.body.style.overflow = ""; }
 
@@ -1212,7 +1255,7 @@ function openCarrier(code){
 }
 
 /* =============== Navigation et événements =============== */
-const UI = {q:"", apt:"", sens:"", ast:"ouvertes", edi:"", fmt:"PAXLST"};
+const UI = {q:"", apt:"", sens:"", ast:"ouvertes", edi:"", fmt:"PAXLST", svc:"Police aux Frontières (DGPN)"};
 /* Persistance locale (navigateur du visiteur seulement) */
 const STORE = "uip-demo-v4";
 function save(){ try { localStorage.setItem(STORE, JSON.stringify({ROLE, THRESHOLD, ALERT, PROC, DOSS, rules: RULES.map(r => [r.id, r.actif, r.poids]), watch: WATCH.slice(6), audit: AUDIT.slice(0, 300), SCEN, COOP: {in: COOP.in, out: COOP.out.filter(o => PAX[o.pax])}, live: LIVE.on})); } catch (e) {} }
@@ -1272,6 +1315,31 @@ function ptSend(){
   PORTAL.last = ack; PORTAL.hist.unshift(ack); render(); toast(r.ok ? (PORTAL.env === "test" ? "Test réussi : format conforme." : "Envoi accepté par l'UIP.") : "Envoi rejeté : voir l'accusé.");
 }
 
+/* ---------- Services : lecture et compte rendu ---------- */
+function markRead(p, s, by){ if (s.lu) return; s.lu = {at: Date.now(), par: by || s.service}; s.hist.unshift({at: Date.now(), action: "Accusé de lecture", detail: s.service, qui: s.service}); audit("Accusé de lecture d'une alerte", `${s.service} · ${p.nom} ${p.prenoms}`); }
+function openSvc(pid){
+  const p = PAX[pid], s = ALERT[pid], f = FLIGHTS.find(x => x.id === p.vol), r = RES[pid]; if (!s) return;
+  markRead(p, s);
+  const dlg = $("#dlg"); dlg.dataset.pax = ""; dlg.dataset.doss = ""; dlg.dataset.coopkey = ""; dlg.dataset.svcp = pid;
+  const opts = Object.values(RETOURS).flat();
+  dlg.innerHTML = `<div class="mh"><div><span class="lbl">${esc(s.service)} · alerte reçue de l'UIP</span><h2 style="font-size:1.3rem">${esc(p.nom)} ${esc(p.prenoms)} · ${esc(f.num)}</h2></div><button class="btn" type="button" data-dclose>Fermer</button></div>
+    <div class="mb"><pre class="fiche">${esc(ficheText(p, f, r, s))}</pre>
+      ${s.retour ? `<div class="msg m-green">Compte rendu envoyé le ${dmy(s.retour.at)} à ${hm(s.retour.at)} : <b>${esc(s.retour.res)}</b>${s.retour.com ? ` · ${esc(s.retour.com)}` : ""}</div>`
+      : `<div class="card"><header><h3>Compte rendu d'intervention</h3></header><div class="grid h2">
+          <label class="field" for="sv-res">Résultat<select id="sv-res">${opts.map(o => `<option>${esc(o)}</option>`).join("")}</select></label>
+          <label class="field" for="sv-com">Observation<input id="sv-com" type="text" placeholder="Ex. contrôle à la descente de l'avion, document saisi"></label></div>
+          <div class="row" style="margin-top:12px"><button class="btn pri" type="button" id="sv-send">Envoyer le compte rendu à l'UIP</button></div></div>`}
+      <p class="note" style="margin:0">Accusé de lecture transmis à l'UIP le ${dmy(s.lu.at)} à ${hm(s.lu.at)}.</p></div>`;
+  if (!dlg.open) dlg.showModal();
+}
+function svSend(){
+  const pid = $("#dlg").dataset.svcp, p = PAX[pid], s = ALERT[pid], res = $("#sv-res").value, com = $("#sv-com").value.trim();
+  s.retour = {at: Date.now(), res, com, par: s.service}; s.hist.unshift({at: Date.now(), action: `Compte rendu : ${res}`, detail: com || "—", qui: s.service});
+  audit("Compte rendu d'intervention reçu", `${s.service} · ${p.nom} ${p.prenoms} · ${res}`);
+  LIVE.feed.unshift({at: Date.now(), t: "svc", txt: `${s.service} : ${res} · ${p.nom} ${p.prenoms}`, pid});
+  toast("Compte rendu envoyé à l'UIP."); openSvc(pid); render();
+}
+
 /* ---------- Géographie (approximative) ---------- */
 const GEO = {OUA:[-1.51,12.35], BOY:[-4.33,11.16], ABJ:[-3.93,5.26], ADD:[38.8,8.98], IST:[28.8,41.0], CDG:[2.55,49.0], CMN:[-7.59,33.37], DSS:[-17.2,14.67], BKO:[-7.95,12.53], NIM:[2.18,13.48], LFW:[1.25,6.17], ACC:[-0.17,5.6], LOS:[3.32,6.58], BRU:[4.48,50.9], DXB:[55.36,25.25], CAI:[31.4,30.1]};
 
@@ -1280,6 +1348,7 @@ const TOUR = [
   {route:"veille", sel:".kpi.alert", t:"Salle de veille", x:"Le point de départ de la permanence : vols suivis, passagers criblés, alertes à traiter et ponctualité des transporteurs."},
   {route:"veille", sel:"#live-now", t:"Méthode push", x:"Les transporteurs poussent leurs messages vers le guichet unique ; chacun reçoit un accusé de réception puis est criblé. Ce bouton simule un envoi tout de suite."},
   {route:"alertes", sel:"main .tw", t:"Alertes", x:"La file des voyageurs signalés. Ouvrez une ligne : l'analyste propose une transmission motivée, un superviseur la valide (double regard)."},
+  {route:"services", sel:"main .tw", t:"Services destinataires", x:"Ce que reçoit chaque service après validation : la fiche de transmission. L'ouverture vaut accusé de lecture, puis le service renvoie un compte rendu d'intervention."},
   {route:"carte", sel:"main .card", t:"Carte des liaisons", x:"Les liaisons suivies, avec en rouge celles qui comptent un voyageur en alerte. Cliquez une liaison pour ses vols."},
   {route:"ciblage", sel:"main .tw", t:"Règles de ciblage", x:"Dix règles et des scénarios composés d'au moins deux critères. La nationalité seule n'est jamais un critère (art. 13)."},
   {route:"reception", sel:".seg-tg", t:"Réception API / PNR", x:"Lisez un message PAXLST (API) ou PNRGOV (PNR). Les données sensibles sont supprimées dès l'intégration (art. 11)."},
@@ -1318,9 +1387,10 @@ function liveTick(){
   if (cand.length) { const [f, w] = cand[0]; f.win[w.k] = {st:"recu", due: f.win[w.k].due, at: now};
     ev.push({t:"msg", txt:`${w.c === "PNR" ? "PNRGOV" : "PAXLST"} poussé par ${carName(f.carrier)} · ${f.num} · ${w.l} (en avance)`, fid:f.id, ack:`CONTRL ${pad(ri(0,99))}${pad(ri(0,99))} · accepté`}); }
   if (LIVE.n % 2 === 0 && fl.length) { const c = LIVE_CASES[(LIVE.n / 2 - 1) % LIVE_CASES.length], f = fl[ri(0, Math.min(5, fl.length - 1))];
-    const q = makePax(f, Object.assign({}, c, {pnr: Object.assign({creation: now - ri(6, 40) * H}, c.pnr || {})})); f.pax.push(q); PAX[q.id] = q; filterSensitive(q); screenAll();
+    const q = makePax(f, Object.assign({}, c, {pnr: Object.assign({creation: now - ri(6, 40) * H}, c.pnr || {})})); q.src = {api: false, pnr: true}; f.pax.push(q); PAX[q.id] = q; filterSensitive(q); screenAll();
     ev.push({t:"msg", txt:`Mise à jour PNRGOV · ${f.num} · 1 réservation ajoutée`, fid:f.id, ack:`CONTRL ${pad(ri(0,99))}${pad(ri(0,99))} · accepté`});
     if (RES[q.id].alerte) { ev.push({t:"alerte", txt:`${q.nom} ${q.prenoms} · ${f.num} · ${RES[q.id].hits.map(h => h.id).join(", ")}`, pid:q.id}); toast(`Nouvelle alerte : ${q.nom} ${q.prenoms} (${f.num})`); audit("Alerte générée par le flux", `${q.nom} ${q.prenoms} · ${f.num}`); } }
+  Object.entries(ALERT).forEach(([id, st]) => { if (st.statut === "transmise" && !st.lu && now - st.at > 20000 && PAX[id]) { markRead(PAX[id], st); ev.push({t:"svc", txt:`${st.service} a lu l'alerte ${PAX[id].nom} ${PAX[id].prenoms}`, pid:id}); } });
   COOP.out.filter(o => o.statut === "En attente" && now - o.at > 15000).forEach(o => { o.statut = "Réponse reçue"; o.reponse = COOP_REP[hashN(o.id) % COOP_REP.length]; o.hist.unshift({at: now, action: "Réponse reçue", detail: o.reponse});
     ev.push({t:"coop", txt:`${o.vers} a répondu à ${o.id}`}); audit("Réponse d'une UIP partenaire", `${o.id} · ${o.vers}`); });
   ev.reverse().forEach(e => LIVE.feed.unshift(Object.assign({at: now}, e))); LIVE.feed.splice(40);
@@ -1411,7 +1481,7 @@ function scSave(){
 }
 
 /* ---------- Recherche rapide (Ctrl + K) ---------- */
-const PAGES = {veille:"Salle de veille", vols:"Vols", carte:"Carte des liaisons", alertes:"Alertes", ciblage:"Règles de ciblage", listes:"Listes de surveillance", dossiers:"Dossiers d'enquête", reception:"Réception API / PNR", recherche:"Recherche nominative (motif obligatoire)", interconnexions:"Interconnexions", cooperation:"Coopération internationale", statistiques:"Statistiques", transporteurs:"Transporteurs", portail:"Portail transporteurs", protection:"Protection des données", apropos:"Architecture"};
+const PAGES = {veille:"Salle de veille", vols:"Vols", carte:"Carte des liaisons", alertes:"Alertes", services:"Services destinataires", ciblage:"Règles de ciblage", listes:"Listes de surveillance", dossiers:"Dossiers d'enquête", reception:"Réception API / PNR", recherche:"Recherche nominative (motif obligatoire)", interconnexions:"Interconnexions", cooperation:"Coopération internationale", statistiques:"Statistiques", transporteurs:"Transporteurs", portail:"Portail transporteurs", protection:"Protection des données", apropos:"Architecture"};
 function qkResults(q){ q = norm(q); const out = [];
   Object.entries(PAGES).forEach(([k, l]) => { if (!q || norm(l).includes(q)) out.push({l, s:"Page", a:"page:" + k}); });
   if (q) { FLIGHTS.filter(f => norm(f.num + " " + f.origine + " " + f.dest + " " + (APT[f.origine] || "") + " " + (APT[f.dest] || "") + " " + carName(f.carrier)).includes(q)).slice(0, 6).forEach(f => out.push({l: fLabel(f), s: `Vol · ${dShort(fTime(f))} ${hm(fTime(f))}`, a: "flight:" + f.id}));
@@ -1473,6 +1543,8 @@ document.addEventListener("click", e => {
   if (t.id === "parse") { UI.edi = $("#edi").value; PARSED = UI.fmt === "PNRGOV" ? parsePnrgov(UI.edi) : parsePaxlst(UI.edi); render(); return; }
   if (t.id === "live-now") { liveTick(); return; }
   if (t.id === "tourbtn") { tourStart(); return; }
+  const svr = t.closest("[data-svc]"); if (svr) { openSvc(svr.dataset.svc); render(); return; }
+  if (t.id === "sv-send") { svSend(); return; }
   const ptm = t.closest("[data-ptmode]"); if (ptm) { PORTAL.mode = ptm.dataset.ptmode; render(); return; }
   if (t.id === "pt-add") { PORTAL.rows.push(blankRow()); render(); return; }
   const ptd = t.closest("[data-ptdel]"); if (ptd) { PORTAL.rows.splice(+ptd.dataset.ptdel, 1); render(); return; }
@@ -1532,6 +1604,7 @@ document.addEventListener("change", e => {
   else if (t.id === "depers") openPax($("#dlg").dataset.pax, t.checked);
   else if (t.dataset.scf !== undefined) { const i = +t.dataset.scf; $("#sc-r" + i).outerHTML = scRow(i, {champ: t.value, val: ""}); }
   else if (t.dataset.scen) { const x = SCEN.find(y => y.id === t.dataset.scen); x.actif = t.checked; screenAll(); audit(t.checked ? "Activation d'un scénario" : "Désactivation d'un scénario", `${x.id} · ${x.nom}`); render(); }
+  else if (t.id === "sv-sel") { UI.svc = t.value; render(); }
   else if (t.id === "pt-car") { PORTAL.car = t.value; PORTAL.fid = ""; PORTAL.last = null; render(); }
   else if (t.id === "pt-vol") { PORTAL.fid = t.value; render(); }
   else if (t.id === "pt-env") { PORTAL.env = t.value; render(); }
@@ -1593,12 +1666,20 @@ function saveWatch(){
   $("#dlg").close(); render(); toast(`Fiche ajoutée : ${hits} concordance(s) trouvée(s) dans les vols en cours.`);
 }
 { const d0 = DOSS[0]; d0.pax = Object.values(PAX).filter(p => ["VELTAMBO","ZALIBOU"].includes(p.nom)).map(p => p.id); d0.notes = [{at: NOW0 - 3*H, qui: "Superviseur de quart", txt: "VELTAMBO et ZALIBOU partagent le même numéro de téléphone dans leurs réservations (exemple fictif)."}]; }
+{ const seedT = (nom, svc, at, lu, retour) => { const p = Object.values(PAX).find(x => x.plant && x.nom === nom); if (!p || !RES[p.id] || !RES[p.id].alerte || ALERT[p.id]) return;
+    const hist = [{at, action:`Transmise à ${svc}`, detail:"Validée sans observation", qui:"Superviseur de quart"}, {at: at - 9*MIN, action:`Transmission à ${svc} proposée`, detail:"Identité confirmée par la date de naissance et le document", qui:"Analyste de permanence"}];
+    const st = {statut:"transmise", service:svc, serviceProp:svc, proposePar:"Analyste", at, hist};
+    if (lu) { st.lu = {at: at + lu, par: svc}; hist.unshift({at: at + lu, action:"Accusé de lecture", detail: svc, qui: svc}); }
+    if (retour) { st.retour = {at: retour[0], res: retour[1], com: retour[2], par: svc}; hist.unshift({at: retour[0], action:`Compte rendu : ${retour[1]}`, detail: retour[2], qui: svc}); }
+    ALERT[p.id] = st; };
+  const vf = Object.values(PAX).find(x => x.plant && x.nom === "VELTAMBO"), vt = vf ? fTime(FLIGHTS.find(f => f.id === vf.vol)) : NOW0;
+  seedT("VELTAMBO", "Police aux Frontières (DGPN)", vt - 3*H, 4*MIN, [vt - 20*MIN, "Personne interpellée", "Interpellé à l'embarquement et remis à la DGSI (exemple fictif)"]);
+  seedT("OUATTARA", "Police aux Frontières (DGPN)", NOW0 - 25*MIN, 3*MIN, null);
+  const dm = Object.values(PAX).find(x => x.plant && x.nom === "DOMASI"); if (dm && RES[dm.id].alerte && !ALERT[dm.id]) ALERT[dm.id] = {statut:"ecartee", at: NOW0 - 50*MIN, hist:[{at: NOW0 - 50*MIN, action:"Écartée comme faux positif", detail:"Date de naissance et nationalité différentes de la fiche FN-2025-0932", qui:"Analyste de permanence"}]}; }
 load();
 try { if (!localStorage.getItem("uip-tour-vu") && !navigator.webdriver) setTimeout(tourStart, 900); } catch (e) {}
 LIVE.feed.push({at: NOW0 - 2*MIN, t:"msg", txt:"Session ouverte : écoute du guichet unique (méthode push)"});
 render();
 })();
 </script>
-
-</body>
-</html>
+</body></html>
