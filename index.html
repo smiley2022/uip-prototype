@@ -1,11 +1,3 @@
-<!doctype html>
-<html lang="fr">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<style>:root{color-scheme:light dark}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
-</head>
-<body>
 <title>Plateforme UIP Burkina</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -265,6 +257,7 @@ pre.fiche{font-family:var(--f-mono);font-size:.78rem;background:var(--surface);b
       <a href="#transporteurs">Transporteurs</a>
       <a href="#portail">Portail transporteurs</a>
       <a href="#protection">Protection des données</a>
+      <a href="#embarquement">Embarquement (iAPI) <span class="cnt" id="cnt-iapi"></span></a>
       <a href="#garde">Garde-fous <span class="cnt" id="cnt-garde"></span></a>
       <a href="#apropos">Architecture</a>
     </nav>
@@ -595,7 +588,7 @@ const stLabel = x => x.st === "recu" ? `reçu à ${hm(x.at)}` : x.st === "retard
 const alertTag = s => ({nouvelle:'<span class="tag t-red">Nouvelle</span>', en_examen:'<span class="tag t-amber">En examen</span>', a_valider:'<span class="tag t-amber">À valider</span>', transmise:'<span class="tag t-blue">Transmise</span>', ecartee:'<span class="tag t-grey">Écartée</span>'})[s.statut];
 const fLabel = f => `${f.num} · ${f.origine} → ${f.dest}`;
 const carName = code => (CARRIERS.find(c => c.code === code) || {nom: code}).nom;
-const cntAlert = () => { $("#cnt-alertes").textContent = openAlerts().length || ""; $("#cnt-coop").textContent = coopOpen() || ""; $("#cnt-conn").textContent = CONNECTORS.filter(c => c.etat !== "ok").length ? "!" : ""; const g = $("#cnt-garde"); if (g) g.textContent = REID.filter(r => r.statut === "En attente du DPD").length || ""; };
+const cntAlert = () => { $("#cnt-alertes").textContent = openAlerts().length || ""; $("#cnt-coop").textContent = coopOpen() || ""; $("#cnt-conn").textContent = CONNECTORS.filter(c => c.etat !== "ok").length ? "!" : ""; const g = $("#cnt-garde"); if (g) g.textContent = REID.filter(r => r.statut === "En attente du DPD").length || ""; const ia = $("#cnt-iapi"); if (ia) ia.textContent = iaPending().length || ""; };
 const connBanner = () => { const down = CONNECTORS.filter(c => c.etat !== "ok"); return down.length ? `<div class="msg m-red">Base indisponible : ${down.map(c => esc(c.nom)).join(", ")}. Les passagers criblés pendant l'incident sont marqués « criblage incomplet » et seront recriblés au rétablissement. <a href="#interconnexions">Voir les interconnexions</a></div>` : ""; };
 
 /* =============== Vues =============== */
@@ -868,6 +861,29 @@ cooperation(){
     ${COOP.out.length ? `<div class="tw" style="border:0"><table class="t min"><thead><tr><th>Référence</th><th>Destinataire</th><th>Objet</th><th>Envoyée le</th><th>Statut</th></tr></thead><tbody>${COOP.out.map(o => row(o, "out")).join("")}</tbody></table></div>` : '<p class="muted" style="margin:0">Aucune demande envoyée. Depuis une fiche passager, utilisez « Interroger une UIP partenaire ».</p>'}</div>`;
 },
 
+embarquement(){
+  const open = FLIGHTS.filter(iaOpen);
+  if (!IA_SEEDED) { IA_SEEDED = true; open.slice(0, 4).forEach(iaRun); }
+  const pend = iaPending(), n = {}; IALOG.forEach(r => n[r.c] = (n[r.c] || 0) + 1);
+  return `
+  <div class="head"><div><span class="lbl">Avant l'embarquement</span><h1>Embarquement (iAPI)</h1><p>À l'enregistrement, la compagnie envoie sa liste et reçoit en quelques secondes un code par voyageur. Refus automatique seulement pour un document signalé ou expiré, et jamais pour un ressortissant qui rentre au pays. Une concordance de personne donne « contacter l'autorité » : l'analyste tranche par une consigne, validée par un superviseur. Le motif n'est jamais communiqué à la compagnie.</p></div></div>
+  <section class="grid k4">${Object.keys(IA).map(c => `<div class="kpi"><span class="lbl">${IA[c][0]}</span><span class="v">${n[c] || 0}</span><span class="s">code ${c}</span></div>`).join("")}</section>
+  <div class="card"><header><h2>Enregistrement ouvert</h2><span class="note">vols qui partent dans les 4 heures</span></header>
+    ${open.length ? `<div class="tw" style="border:0"><table class="t min"><thead><tr><th>Vol</th><th>Départ</th><th>Voyageurs</th><th></th></tr></thead><tbody>
+    ${open.map(f => `<tr><td><b>${esc(fLabel(f))}</b></td><td class="n">${hm(f.std)}</td><td class="n">${f.pax.length}</td><td><button class="btn sm pri" type="button" data-iasim="${f.id}">Simuler la demande de la compagnie</button></td></tr>`).join("")}</tbody></table></div>` : '<p class="muted" style="margin:12px">Aucun vol en enregistrement.</p>'}</div>
+  <div class="card"><header><h2>À trancher</h2><span class="note">réponses « contacter l'autorité » sans consigne</span></header>
+    ${pend.length ? `<div class="tw" style="border:0"><table class="t min"><thead><tr><th>Heure</th><th>Voyageur</th><th>Vol</th><th>Motif interne</th><th></th></tr></thead><tbody>
+    ${pend.map(r => `<tr><td class="n">${hm(r.at)}</td><td><b>${esc(r.nom)}</b><div class="note">${esc(r.doc || "")}</div></td><td class="n">${esc(r.num)}</td><td class="note">${esc(r.why)}</td><td>${ROLE === "DPD" || ROLE === "Administrateur" ? "" : `<button class="btn sm" type="button" data-iadir="${r.pax}">Poser une consigne</button>`}</td></tr>`).join("")}</tbody></table></div>` : '<p class="muted" style="margin:12px">Rien en attente. Simulez une demande sur un vol ci-dessus.</p>'}</div>
+  <div class="card"><header><h2>Consignes d'embarquement</h2><span class="note">motivées, 24 h, validées par un superviseur qui n'en est pas l'auteur</span></header>
+    ${DIRS.length ? `<div class="tw" style="border:0"><table class="t min"><thead><tr><th>Consigne</th><th>Voyageur</th><th>Motif</th><th>État</th><th></th></tr></thead><tbody>
+    ${DIRS.map(d => `<tr><td><b>${d.id}</b> <span class="tag ${IA[d.decision][1]}">${d.decision}</span><div class="note">${esc(ROLE_LABEL[d.par])} · ${hm(d.at)}</div></td><td>${esc(d.nom)}</td><td class="note">${esc(d.motif)}<div>${esc(d.ref)}</div></td>
+      <td><span class="tag ${d.statut === "Active" ? "t-green" : d.statut === "À valider" ? "t-blue" : "t-grey"}">${d.statut}</span>${d.valPar ? `<div class="note">validée par ${esc(ROLE_LABEL[d.valPar])}</div>` : ""}</td>
+      <td>${d.statut === "À valider" && ROLE === "Superviseur" && d.par !== "Superviseur" ? `<button class="btn sm pri" type="button" data-iaval="${d.id}:ok">Valider</button> <button class="btn sm ghost" type="button" data-iaval="${d.id}:non">Refuser</button>` : d.statut === "À valider" ? '<span class="note">Validation par un superviseur autre que l\'auteur</span>' : ""}
+        ${["Active","À valider"].includes(d.statut) && (ROLE === "Superviseur" || ROLE === "DPD") ? `<button class="btn sm ghost" type="button" data-ialift="${d.id}">Lever</button>` : ""}</td></tr>`).join("")}</tbody></table></div>` : '<p class="muted" style="margin:12px">Aucune consigne.</p>'}</div>
+  ${IALOG.length ? `<div class="card"><header><h2>Dernières réponses</h2><span class="note">${IALOG.length} voyageur(s)</span></header><div class="tw" style="border:0"><table class="t min"><thead><tr><th>Heure</th><th>Voyageur</th><th>Vol</th><th>Réponse</th><th>Motif interne</th></tr></thead><tbody>
+    ${IALOG.filter(r => r.c !== "0Z").slice(0, 40).map(r => `<tr><td class="n">${hm(r.at)}</td><td><b>${esc(r.nom)}</b></td><td class="n">${esc(r.num)}</td><td><span class="tag ${IA[r.c][1]}">${r.c} · ${IA[r.c][0]}</span></td><td class="note">${esc(r.why)}</td></tr>`).join("")}</tbody></table></div><p class="note" style="margin:8px 12px 12px">Seules les réponses autres que 0Z sont listées.</p></div>` : ""}`;
+},
+
 garde(){
   const pend = REID.filter(r => r.statut === "En attente du DPD").length;
   return `
@@ -880,6 +896,7 @@ garde(){
        ["Recherche", "Motif et référence de procédure obligatoires, inscrits au journal."],
        ["Données masquées", "Après 6 mois, l'identité est masquée et scellée (chiffrée). Elle ne se rouvre que sur demande motivée, accord du délégué à la protection des données, pour le seul demandeur et 48 heures."],
        ["Coopération internationale", "Aucun échange sans base juridique en vigueur ; seules les catégories de données prévues par l'accord ; validation du délégué avant envoi."],
+       ["Embarquement (iAPI)", "Refus automatique seulement pour un document signalé ou expiré ; jamais pour un ressortissant qui rentre au pays ; une concordance de personne donne « contacter l'autorité » et l'analyste tranche ; motif jamais transmis à la compagnie."],
        ["Accès", "Double authentification (code à usage unique) pour chaque agent ; compte verrouillé après 5 échecs ; l'administrateur ne voit pas les passagers."]]
       .map(([a, b]) => `<tr><td><b>${a}</b></td><td>${b}</td></tr>`).join("")}</tbody></table></div>
   <div class="card"><header><h2>Demandes de réidentification</h2><span class="note">${pend} en attente du délégué</span></header>
@@ -1464,6 +1481,59 @@ setInterval(() => { if (LIVE.on && !document.hidden) liveTick(); }, 30000);
 
 /* ---------- Coopération internationale (simulation) ---------- */
 const PARTNERS = ["UIP Côte d'Ivoire","UIP Mali","UIP Niger","UIP Sénégal","UIP Ghana","UIP Togo","UIP France"];
+/* iAPI : réponse d'embarquement par voyageur (mêmes règles que le logiciel serveur, uip/iapi.py) */
+const IA = {"0Z":["Embarquement autorisé","t-green"], "1Z":["Non autorisé","t-red"], "2Z":["Contacter l'autorité","t-amber"], "4Z":["Données incomplètes","t-grey"]};
+const IA_TXT = {"0Z":"EMBARQUEMENT AUTORISE", "1Z":"EMBARQUEMENT NON AUTORISE", "2Z":"CONTACTER L AUTORITE AVANT EMBARQUEMENT", "4Z":"DONNEES INCOMPLETES RENVOYER"};
+const DIRS = []; const IALOG = []; let IA_SEEDED = false;
+const iaOpen = f => f.std > Date.now() && f.std - Date.now() <= 4 * H;
+function iaDir(p){ return DIRS.find(d => d.pax === p.id && d.statut === "Active" && d.fin > Date.now()); }
+function iaDecide(p, f){
+  const hits = (RES[p.id] || {hits: []}).hits, ids = new Set(hits.map(h => h.id)), d = iaDir(p);
+  const miss = [["nom", p.nom], ["date de naissance", p.ddn], ["nationalité", p.nat], ["numéro de document", p.doc && p.doc.num], ["expiration", p.doc && p.doc.exp]].filter(x => !x[1]).map(x => x[0]);
+  let c, why;
+  if (d && !(d.decision === "0Z" && miss.length)) { c = d.decision; why = `Consigne ${d.id} validée par ${d.valPar} (${d.ref})`; }
+  else if (miss.length) { c = "4Z"; why = "Données manquantes : " + miss.join(", "); }
+  else if (ids.has("R2") || ids.has("R9")) { c = "2Z"; why = "Concordance de personne à confirmer par un analyste (" + [...ids].filter(x => x === "R2" || x === "R9").join(", ") + ")"; }
+  else if (ids.has("R1")) { c = "1Z"; why = "Document signalé volé ou perdu (R1)"; }
+  else if (ids.has("R4")) { c = "1Z"; why = "Document expiré (R4)"; }
+  else { c = "0Z"; why = ids.size ? `Aucun motif d'opposition (indicateurs sans effet sur l'embarquement : ${[...ids].join(", ")})` : "Aucun motif d'opposition"; }
+  if (c === "1Z" && p.nat === "BFA" && f.sens === "Arrivée") { c = "2Z"; why += " · ressortissant qui rentre au pays : jamais de refus, contact de l'autorité"; }
+  return {c, why};
+}
+function iaPending(){ const seen = new Set(); return IALOG.filter(r => r.c === "2Z" && !DIRS.some(d => d.pax === r.pax && ["Active","À valider"].includes(d.statut)) && !seen.has(r.pax) && seen.add(r.pax)); }
+function iaRun(f){
+  const t0 = performance.now(), rows = f.pax.map(p => ({p, ...iaDecide(p, f)})), ms = Math.max(1, Math.round(performance.now() - t0));
+  rows.forEach(r => IALOG.unshift({at: Date.now(), vol: f.id, num: f.num, pax: r.p.id, nom: `${r.p.nom} ${r.p.prenoms}`, doc: r.p.doc.num, c: r.c, why: r.why, ms}));
+  IALOG.splice(2000);
+  const n = {}; rows.forEach(r => n[r.c] = (n[r.c] || 0) + 1);
+  audit("Réponse iAPI à la compagnie", `${f.num} · ${rows.length} voyageur(s) · ${Object.entries(n).map(([k, v]) => k + " : " + v).join(", ")}`);
+  const ref = String(ri(100000, 999999)), car = f.num.split(" ")[0], d = new Date(f.std), y = String(d.getUTCFullYear()).slice(2);
+  const L = ["UNH+1+CUSRES:D:05B:UN:IATA'", "BGM+962'", `RFF+TN:${ref}'`, `RFF+AF:${f.num.replace(" ", "")}'`, `DTM+189:${y}${pad(d.getUTCMonth()+1)}${pad(d.getUTCDate())}${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}:201'`, `LOC+125+${f.origine}'`, `LOC+87+${f.dest}'`];
+  rows.forEach((r, i) => L.push("ERP+2'", `RFF+AVF:${i + 1}'`, `RFF+ABO:${r.p.doc.num || ""}'`, `ERC+${r.c}'`, `FTX+AAH+++${IA_TXT[r.c]}'`));
+  L.push(`UNT+${L.length + 1}+1'`);
+  return {rows, ms, n, text: ["UNA:+.? '", `UNB+UNOA:4+BFAUIP:ZZ+${car}:ZZ+${y}${pad(d.getUTCMonth()+1)}${pad(d.getUTCDate())}:${pad(new Date().getUTCHours())}${pad(new Date().getUTCMinutes())}+${ref}R'`, ...L, `UNZ+1+${ref}R'`].join("\n")};
+}
+function iaShow(f){
+  const r = iaRun(f), dlg = $("#dlg");
+  dlg.innerHTML = `<div class="mh"><div><span class="lbl">Réponse iAPI rendue à ${esc(f.carrier)} · ${r.ms} ms</span><h2 style="font-size:1.35rem">${esc(fLabel(f))}</h2></div><button class="btn" type="button" data-dclose>Fermer</button></div>
+    <div class="mb"><div class="row">${Object.keys(IA).map(c => `<span class="tag ${IA[c][1]}">${c} · ${IA[c][0]} : ${r.n[c] || 0}</span>`).join(" ")}</div>
+    <p class="note">La compagnie reçoit uniquement le message ci-dessous : un code par voyageur et un texte générique. Le motif reste à l'UIP.</p>
+    <pre class="mono" style="font-variant-ligatures:none;white-space:pre-wrap;max-height:260px;overflow:auto;font-size:.78rem">${esc(r.text.split("\n").slice(0, 60).join("\n"))}${r.rows.length > 10 ? "\n…" : ""}</pre>
+    <div class="tw"><table class="t min"><thead><tr><th>Voyageur</th><th>Réponse</th><th>Motif interne (jamais transmis)</th></tr></thead><tbody>
+    ${r.rows.filter(x => x.c !== "0Z").map(x => `<tr><td><b>${esc(x.p.nom)}</b> ${esc(x.p.prenoms)}<div class="note">${esc(x.p.nat)} · ${esc(x.p.doc.num || "")}</div></td><td><span class="tag ${IA[x.c][1]}">${x.c}</span></td><td class="note">${esc(x.why)}</td></tr>`).join("") || '<tr><td colspan="3" class="note">Tous les voyageurs sont autorisés.</td></tr>'}</tbody></table></div></div>`;
+  if (!dlg.open) dlg.showModal();
+  cntAlert();
+}
+function iaPropose(paxId){
+  const p = PAX[paxId]; if (!p) return;
+  const dec = prompt(`Consigne pour ${p.nom} ${p.prenoms}\n0Z = autoriser, 2Z = contacter l'autorité, 1Z = ne pas embarquer`, "0Z"); if (!dec) return;
+  if (!["0Z","1Z","2Z"].includes(dec.trim().toUpperCase())) { toast("Consigne : 0Z, 1Z ou 2Z."); return; }
+  const motif = prompt("Motif précis (20 caractères au moins)"); if (!motif || motif.trim().length < 20) { toast("Motif précis obligatoire (20 caractères au moins)."); return; }
+  const ref = prompt("Référence de procédure"); if (!ref || ref.trim().length < 3) { toast("Référence de procédure obligatoire."); return; }
+  const d = {id: "C" + (DIRS.length + 1), pax: p.id, nom: `${p.nom} ${p.prenoms}`, decision: dec.trim().toUpperCase(), motif: motif.trim(), ref: ref.trim(), par: ROLE, at: Date.now(), fin: Date.now() + 24 * H, statut: "À valider"};
+  DIRS.unshift(d); audit("Consigne d'embarquement proposée", `${d.id} · ${d.decision} · ${d.nom}`); render(); toast(`Consigne ${d.id} soumise au superviseur : sans effet tant qu'elle n'est pas validée.`);
+}
+
 /* Homologation des transporteurs : [clé, libellé court, contrôle automatique ?] */
 const HOMOL = [["api","PAXLST valide",true],["pnr","PNRGOV valide",true],["vol","Vol de 50 pax ou plus",true],["qual","5 envois sans rejet",true],["vers","Versions reconnues",true],
   ["conv","Protocole signé",false],["contact","Contact 24 h/24",false],["canal","Canal sécurisé",false],["info","Information des passagers",false]];
@@ -1554,7 +1624,7 @@ function scSave(){
 }
 
 /* ---------- Recherche rapide (Ctrl + K) ---------- */
-const PAGES = {veille:"Salle de veille", vols:"Vols", carte:"Carte des liaisons", alertes:"Alertes", services:"Services destinataires", ciblage:"Règles de ciblage", listes:"Listes de surveillance", dossiers:"Dossiers d'enquête", reception:"Réception API / PNR", recherche:"Recherche nominative (motif obligatoire)", interconnexions:"Interconnexions", cooperation:"Coopération internationale", statistiques:"Statistiques", transporteurs:"Transporteurs", portail:"Portail transporteurs", protection:"Protection des données", garde:"Garde-fous", apropos:"Architecture"};
+const PAGES = {veille:"Salle de veille", vols:"Vols", carte:"Carte des liaisons", alertes:"Alertes", services:"Services destinataires", ciblage:"Règles de ciblage", listes:"Listes de surveillance", dossiers:"Dossiers d'enquête", reception:"Réception API / PNR", recherche:"Recherche nominative (motif obligatoire)", interconnexions:"Interconnexions", cooperation:"Coopération internationale", statistiques:"Statistiques", transporteurs:"Transporteurs", portail:"Portail transporteurs", protection:"Protection des données", embarquement:"Embarquement (iAPI)", garde:"Garde-fous", apropos:"Architecture"};
 function qkResults(q){ q = norm(q); const out = [];
   Object.entries(PAGES).forEach(([k, l]) => { if (!q || norm(l).includes(q)) out.push({l, s:"Page", a:"page:" + k}); });
   if (q) { FLIGHTS.filter(f => norm(f.num + " " + f.origine + " " + f.dest + " " + (APT[f.origine] || "") + " " + (APT[f.dest] || "") + " " + carName(f.carrier)).includes(q)).slice(0, 6).forEach(f => out.push({l: fLabel(f), s: `Vol · ${dShort(fTime(f))} ${hm(fTime(f))}`, a: "flight:" + f.id}));
@@ -1639,6 +1709,15 @@ document.addEventListener("click", e => {
   if (t.id === "sc-test") { const c = scRead(); const n = c.length < 2 ? null : scTest(c).length; $("#sc-out").innerHTML = n === null ? '<div class="msg m-amber">Choisissez au moins deux critères.</div>' : `<div class="msg ${n / Object.keys(PAX).length > .05 ? "m-amber" : "m-green"}">${n} passager(s) concerné(s) sur ${Object.keys(PAX).length} (${(n / Object.keys(PAX).length * 100).toFixed(1)} %).${n / Object.keys(PAX).length > .05 ? " Scénario trop large : il produirait beaucoup de faux positifs." : ""}</div>`; return; }
   if (t.id === "sc-save") { scSave(); return; }
   const hm1 = t.closest("[data-homol]"); if (hm1) { const r = prompt("Référence (document signé, nom du contact, date du test…)"); if (!r || r.trim().length < 3) return; HOMOL_SIGN[hm1.dataset.homol] = r.trim(); const [code, i] = hm1.dataset.homol.split(":"); audit("Homologation transporteur", `${code} · ${HOMOL[+i][1]} · réf. ${r.trim()}`); render(); toast("Étape signée."); return; }
+  const ias = t.closest("[data-iasim]"); if (ias) { iaShow(FLIGHTS.find(f => f.id === ias.dataset.iasim)); return; }
+  const iad = t.closest("[data-iadir]"); if (iad) { if (ROLE === "DPD" || ROLE === "Administrateur") { toast("Consignes posées par les analystes et superviseurs."); return; } iaPropose(iad.dataset.iadir); return; }
+  const iav = t.closest("[data-iaval]"); if (iav) { const [id, k] = iav.dataset.iaval.split(":"); const d = DIRS.find(x => x.id === id);
+    if (ROLE !== "Superviseur" || d.par === ROLE) { toast("La validation revient à un superviseur qui n'est pas l'auteur de la consigne."); return; }
+    const m = prompt(k === "ok" ? "Motif de la validation (pièces vues…)" : "Motif du refus"); if (!m || m.trim().length < 5) { toast("Motif obligatoire."); return; }
+    d.statut = k === "ok" ? "Active" : "Refusée"; d.valPar = ROLE; audit(k === "ok" ? "Consigne d'embarquement validée" : "Consigne d'embarquement refusée", `${d.id} · ${d.decision} · ${m}`); render();
+    toast(k === "ok" ? `Consigne ${d.id} active : elle s'applique à la prochaine demande de la compagnie.` : "Consigne refusée."); return; }
+  const ial = t.closest("[data-ialift]"); if (ial) { const d = DIRS.find(x => x.id === ial.dataset.ialift); const m = prompt("Motif de la levée"); if (!m || m.trim().length < 5) { toast("Motif obligatoire."); return; }
+    d.statut = "Levée"; audit("Consigne d'embarquement levée", `${d.id} · ${m}`); render(); return; }
   const rd = t.closest("[data-reid]"); if (rd) { const [id, d] = rd.dataset.reid.split(":"); const r = REID.find(x => x.id === id); const m = prompt(d === "ok" ? "Motif de l'accord (réquisition vérifiée…)" : "Motif du refus"); if (!m || m.trim().length < 5) { toast("Motif obligatoire (5 caractères au moins)."); return; } r.statut = d === "ok" ? "Accordée" : "Refusée"; audit(d === "ok" ? "Réidentification accordée (48 h)" : "Réidentification refusée", `${r.ref} · demandeur ${r.par}`); render(); toast(d === "ok" ? "Accès accordé au seul demandeur, pour 48 heures." : "Demande refusée."); return; }
   if (t.id === "resetdemo") { if (confirm("Effacer les décisions, dossiers et réglages enregistrés dans ce navigateur ?")) { try { localStorage.removeItem(STORE); } catch (err) {} location.hash = ""; location.reload(); } return; }
   if (t.id === "newdoss") { const d = {id: `DOS-2026-${pad(DOSS.length + 1).padStart(3, "0")}`, titre: "Nouveau dossier", statut: "Ouvert", ref: "À compléter", pax: [], notes: [], at: Date.now()}; DOSS.unshift(d); audit("Ouverture d'un dossier d'enquête", d.id); render(); openDossier(d.id); return; }
@@ -1757,4 +1836,3 @@ LIVE.feed.push({at: NOW0 - 2*MIN, t:"msg", txt:"Session ouverte : écoute du gui
 render();
 })();
 </script>
-</body></html>
