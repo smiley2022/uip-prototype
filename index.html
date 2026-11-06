@@ -300,7 +300,8 @@ function jw(a, b){ if (a === b) return 1; const la = a.length, lb = b.length; if
   for (let i = 0; i < la; i++) for (let j = Math.max(0, i - md); j < Math.min(lb, i + md + 1); j++) if (!mb[j] && a[i] === b[j]) { ma[i] = mb[j] = true; m++; break; }
   if (!m) return 0; let t = 0, k = 0; for (let i = 0; i < la; i++) if (ma[i]) { while (!mb[k]) k++; if (a[i] !== b[k]) t++; k++; }
   const j = (m/la + m/lb + (m - t/2)/m) / 3; let p = 0; while (p < 4 && a[p] === b[p]) p++; return j + p * 0.1 * (1 - j); }
-const nameSim = (n1, p1, n2, p2) => { const A = norm(n1+" "+p1), B = norm(n2+" "+p2), C = norm(p2+" "+n2); return Math.max(jw(A,B), jw(A,C)); };
+const NCACHE = new Map(); const normC = s => { let v = NCACHE.get(s); if (v === undefined) { v = norm(s); if (NCACHE.size > 50000) NCACHE.clear(); NCACHE.set(s, v); } return v; };
+const nameSim = (n1, p1, n2, p2) => { const A = normC(n1+" "+p1), B = normC(n2+" "+p2), C = normC(p2+" "+n2); return Math.max(jw(A,B), jw(A,C)); };
 function toast(m){ document.querySelectorAll(".toast").forEach(x => x.remove()); const t = document.createElement("div"); t.className = "toast"; t.textContent = m; document.body.appendChild(t); setTimeout(() => t.remove(), 2800); }
 
 /* =============== Référentiels (fictifs) =============== */
@@ -309,13 +310,15 @@ const CARRIERS = [
   {code:"ZV", nom:"Volta Airways", p:.92},
   {code:"ZK", nom:"Kora Aviation", p:.86},
   {code:"ZW", nom:"Atlantique Air", p:.74},
-  {code:"ZY", nom:"Harmattan Jet", p:.55}
+  {code:"ZY", nom:"Harmattan Jet", p:.55},
+  {code:"ZN", nom:"Niger Bend Airlines", p:.9},
+  {code:"ZX", nom:"Savane Cargo & Pax", p:.8}
 ];
-const ORIG = [["ABJ","Abidjan"],["ADD","Addis-Abeba"],["IST","Istanbul"],["CDG","Paris"],["CMN","Casablanca"],["DSS","Dakar"],["BKO","Bamako"],["NIM","Niamey"],["LFW","Lomé"],["ACC","Accra"],["LOS","Lagos"],["BRU","Bruxelles"],["DXB","Dubaï"],["CAI","Le Caire"]];
+const ORIG = [["ABJ","Abidjan"],["ADD","Addis-Abeba"],["IST","Istanbul"],["CDG","Paris"],["CMN","Casablanca"],["DSS","Dakar"],["BKO","Bamako"],["NIM","Niamey"],["LFW","Lomé"],["ACC","Accra"],["LOS","Lagos"],["BRU","Bruxelles"],["DXB","Dubaï"],["CAI","Le Caire"],["CKY","Conakry"],["COO","Cotonou"],["NDJ","N'Djamena"],["DLA","Douala"],["NBO","Nairobi"],["JED","Djeddah"],["MAD","Madrid"],["FCO","Rome"]];
 const APT = {OUA:"Ouagadougou", BOY:"Bobo-Dioulasso"}; ORIG.forEach(([c,n]) => APT[c] = n);
-const FN_M = ["Issouf","Boukary","Salif","Rasmané","Adama","Oumarou","Moussa","Ibrahim","Souleymane","Jean-Baptiste","Pierre","Mehmet","Yohannes","Kwame","Chinedu","Mamadou","Lucas","Karim","Omar","Abdoul","Paul","Seydou"];
-const FN_F = ["Aminata","Mariam","Awa","Fatimata","Kadiatou","Aïcha","Hélène","Claire","Ayşe","Selam","Ama","Ngozi","Fatou","Sophie","Leila","Nadia","Rokia","Salimata"];
-const LN = ["OUEDRAOGO","SAWADOGO","KABORE","TRAORE","COMPAORE","ZONGO","KONATE","DIALLO","SANOU","OUATTARA","KOUYATE","BAMBA","KOFFI","MENSAH","OKAFOR","ADEYEMI","DIOP","NDIAYE","CISSE","TOURE","MARTIN","DUBOIS","YILMAZ","KAYA","TESFAYE","BEKELE","HAIDARA","SOW","KEITA","ILBOUDO","NIKIEMA","YAMEOGO"];
+const FN_M = ["Issouf","Boukary","Salif","Rasmané","Adama","Oumarou","Moussa","Ibrahim","Souleymane","Jean-Baptiste","Pierre","Mehmet","Yohannes","Kwame","Chinedu","Mamadou","Lucas","Karim","Omar","Abdoul","Paul","Seydou","Hamidou","Lassané","Inoussa","Arouna","Daouda","Emmanuel","Francis","Kofi","Emeka","Ahmed","Youssef","Thomas","Antoine","Marco","Ali","Dawit","Wei","Rachid"];
+const FN_F = ["Aminata","Mariam","Awa","Fatimata","Kadiatou","Aïcha","Hélène","Claire","Ayşe","Selam","Ama","Ngozi","Fatou","Sophie","Leila","Nadia","Rokia","Salimata","Alimata","Habibou","Zalissa","Odile","Pauline","Adjoa","Chioma","Yasmine","Marie","Giulia","Elif","Hiwot","Mei","Assita","Bintou","Clarisse"];
+const LN = ["OUEDRAOGO","SAWADOGO","KABORE","TRAORE","COMPAORE","ZONGO","KONATE","DIALLO","SANOU","OUATTARA","KOUYATE","BAMBA","KOFFI","MENSAH","OKAFOR","ADEYEMI","DIOP","NDIAYE","CISSE","TOURE","MARTIN","DUBOIS","YILMAZ","KAYA","TESFAYE","BEKELE","HAIDARA","SOW","KEITA","ILBOUDO","NIKIEMA","YAMEOGO","TAPSOBA","ZERBO","SOME","DABIRE","PODA","KAMBOU","HIEN","BATIONO","GUIRO","BARRY","DEMBELE","COULIBALY","SYLLA","FOFANA","SANGARE","AGYEMAN","OSEI","EZE","NWOSU","MOREAU","PETIT","GARCIA","ROSSI","DEMIR","ÇELIK","GIRMA","ALEMU","HASSAN","BENALI","WANG","LI"];
 const NATS = ["BFA","BFA","BFA","BFA","CIV","MLI","NER","SEN","GHA","NGA","TGO","FRA","BEL","TUR","ETH","MAR","EGY","USA","CAN","CHN","LBN"];
 const AGENCES = ["Agence Faso Voyages (fictive)","Sahel Tours (fictive)","Vente directe en ligne","Comptoir aéroport","Kanazoé Travel (fictive)"];
 /* Codes SSR exclus à la réception (art. 11 : religion, santé) */
@@ -345,6 +348,18 @@ const NOTICES = [
   {id:"N3", type:"Bleue", nom:"ROSSAMBA", prenoms:"Yacouba", ddn:"1983-08-27", ref:"A-2290/1-2026", objet:"Recueillir des informations sur l'identité et les déplacements"},
   {id:"N4", type:"Diffusion", nom:"NARGUELE", prenoms:"Fatim", ddn:"1991-09-30", ref:"D-5531/2026", objet:"Signalement d'un État membre"}
 ];
+/* Volume de simulation : fiches, documents et notices fictifs générés (préfixe X), pour éprouver le criblage */
+{ const SYL = ["BA","KO","RI","SO","MA","TE","LU","NA","DI","GO","ZE","PA","VO","KI","RA","TOU","MBE","SSA","LI","DO","NGA","FI","WE","YO"];
+  const fake = () => { let n = ""; const k = ri(3,4); for (let i = 0; i < k; i++) n += pick(SYL); return n; };
+  const NIV = ["Signaler","Signaler","Surveiller discrètement","Interpeller"], SRC = ["DGSI","DGPN","DGD","CNSE","EMGN","CENTIF"];
+  for (let i = 0; i < 400; i++){ const sx = rnd() < .7 ? "M" : "F";
+    WATCH.push({id:"X" + (i + 1), nom: fake(), prenoms: pick(sx === "M" ? ["Tiémoko","Bréhima","Lamine","Siaka","Zakaria","Gaoussou","Mahamadi","Nouhoun","Yacouba","Sibiri"] : ["Nafissatou","Korotimi","Djénéba","Haoua","Massandjé","Téné","Pélagie","Bibata"]) + " " + pick(["Ali","Idrissa","Tidiane","Noël","Hamado","Désiré","Mariama","Rasmata"]), ddn:`${ri(1955, 2004)}-${pad(ri(1,12))}-${pad(ri(1,28))}`, niveau: pick(NIV), source: pick(SRC), ref:"FN-" + ri(2022, 2026) + "-X" + String(1000 + i), vol:true}); }
+  const MOT = ["Volé","Perdu","Volé (vierge)","Révoqué","Invalidé"];
+  for (let i = 0; i < 600; i++){ const e = pick(["BFA","CIV","MLI","NER","SEN","GHA","NGA","TGO","FRA","TUR"]);
+    SLTD.push({num: "ABCNP"[ri(0,4)] + String(ri(1000000, 9999999)), emet: e, type: rnd() < .9 ? "Passeport" : "Carte d'identité", motif: pick(MOT), date: iso(NOW0 - ri(10, 1500) * DAY), vol:true}); }
+  const NT = [["Rouge","Recherché pour arrestation en vue d'extradition"],["Jaune","Personne portée disparue"],["Bleue","Recueillir des informations sur l'identité et les déplacements"],["Verte","Avertissement sur les activités criminelles"],["Diffusion","Signalement d'un État membre"]];
+  for (let i = 0; i < 60; i++){ const t = pick(NT); NOTICES.push({id:"XN" + (i + 1), type:t[0], nom: fake(), prenoms: pick(["Gervais","Kalidou","Eyerusalem","Ifeoma","Abdourahamane","Ténin"]) + " " + pick(["Wendpouiré","Bassirou","Félicité"]), ddn:`${ri(1960, 2010)}-${pad(ri(1,12))}-${pad(ri(1,28))}`, ref: (t[0] === "Diffusion" ? "D-" : "A-") + ri(1000, 9999) + "/" + ri(1,12) + "-" + ri(2023, 2026), objet: t[1], vol:true}); }
+}
 /* Bases interconnectées (simulation) */
 const CONNECTORS = [
   {id:"sltd", nom:"INTERPOL · documents de voyage volés ou perdus", via:"BCN Ouagadougou · réseau I-24/7", sens:"Interrogation", regles:["R1"], etat:"ok", lat:180},
@@ -389,7 +404,7 @@ function makePax(f, opts = {}){
   return p;
 }
 function genFlights(){
-  const n = 26; const used = new Set();
+  const n = 72; const used = new Set();
   for (let i = 0; i < n; i++){
     const car = CARRIERS[i % CARRIERS.length];
     const [o] = pick(ORIG); const local = rnd() < .8 ? "OUA" : "BOY";
@@ -398,7 +413,7 @@ function genFlights(){
     let num; do { num = car.code + " " + ri(100, 899); } while (used.has(num)); used.add(num);
     const dur = ri(2, 7) * H;
     const f = {id: "F" + (i + 1), num, carrier: car.code, sens, origine: sens === "Arrivée" ? o : local, dest: sens === "Arrivée" ? local : o,
-      std: sens === "Arrivée" ? t - dur : t, sta: sens === "Arrivée" ? t : t + dur, local, cap: ri(60, 180), win: {}, pax: [], source: "Génération démo"};
+      std: sens === "Arrivée" ? t - dur : t, sta: sens === "Arrivée" ? t : t + dur, local, cap: ri(80, 220), win: {}, pax: [], source: "Génération démo"};
     FLIGHTS.push(f);
   }
   FLIGHTS.sort((a,b) => (a.sens === "Arrivée" ? a.sta : a.std) - (b.sens === "Arrivée" ? b.sta : b.std));
@@ -414,7 +429,7 @@ function genFlights(){
     });
     const anyData = ["ddp1","ddp2","api","ferm"].some(k => f.win[k].st === "recu" || f.win[k].st === "retard");
     if (!anyData) return;
-    const np = ri(26, 64), crew = ri(4, 7);
+    const np = Math.round(f.cap * (.55 + rnd() * .4)), crew = ri(4, 9);
     for (let i = 0; i < np; i++){ const q = makePax(f), prev = f.pax[f.pax.length - 1];
       if (prev && rnd() < .14) { ["loc","tel","carte","email","paiement","creation","emission","agence","allerSimple"].forEach(k => q.pnr[k] = prev.pnr[k]); if (rnd() < .6) q.nom = prev.nom; }
       f.pax.push(q); }
@@ -435,6 +450,16 @@ function genFlights(){
   if (mm) mm.pnr.api = {nom:"TRAORE", prenoms:"Abdoulaye", ddn:"1990-07-15"};
   plant(6, {nom:"ZALIBOU", prenoms:"Moctar", ddn:"1995-02-18", sexe:"M", nat:"NER", pnr:{creation: withPax[6 % withPax.length].std - 20*H, paiement:"Espèces", allerSimple:true, tel:"+226 76 41 08 52"}});
   plant(7, {nom:"TIMBELA", prenoms:"Aïssata", ddn:"2011-03-04", sexe:"F", nat:"BFA", pnr:{agence:"Comptoir aéroport", paiement:"Espèces"}});
+  /* Concordances de volume : quelques voyageurs ordinaires prennent l'identité d'une fiche, d'un document ou d'une notice générés */
+  const pool = FLIGHTS.filter(f => f.pax.length).flatMap(f => f.pax.filter(p => p.statut === "Passager"));
+  const take = () => pool.splice(ri(0, pool.length - 1), 1)[0];
+  const VW = WATCH.filter(w => w.vol);
+  for (let i = 0; i < 26; i++){ const p = take(), w = VW[i * 7]; if (!p || !w) break; p.nom = w.nom; p.prenoms = w.prenoms; p.ddn = w.ddn; }
+  for (let i = 0; i < 18; i++){ const p = take(), w = VW[i * 7 + 3]; if (!p || !w) break; p.nom = w.nom.slice(0, -1) + (w.nom.endsWith("A") ? "AH" : "E"); p.prenoms = w.prenoms; }
+  const VD = SLTD.filter(d => d.vol);
+  for (let i = 0; i < 22; i++){ const p = take(), d = VD[i * 11]; if (!p || !d) break; p.doc = {type:"P", num: d.num, emet: d.emet, exp: iso(NOW0 + ri(100, 2000) * DAY)}; p.nat = d.emet; }
+  const VN = NOTICES.filter(n => n.vol);
+  for (let i = 0; i < 9; i++){ const p = take(), n = VN[i * 5]; if (!p || !n) break; p.nom = n.nom; p.prenoms = n.prenoms; p.ddn = n.ddn; }
   FLIGHTS.forEach(f => f.pax.forEach(p => { PAX[p.id] = p;
     if (p.statut !== "Passager") p.src = {api: true, pnr: false};
     else if (!p.plant) { const h = hashN(p.id + "src") % 100; p.src = h < 3 ? {api: false, pnr: true} : h < 5 ? {api: true, pnr: false} : {api: true, pnr: true}; } }));
@@ -501,6 +526,12 @@ function linkPass(list){ const r10 = RULES.find(r => r.id === "R10"); if (!r10.a
     r.hits.push({id:"R10", nom:r10.nom, poids:r10.poids, detail:`${l.via.map(k => LK[k]).join(", ")} que ${l.p.nom} ${l.p.prenoms} (${RES[l.p.id].hits.find(h => ["R1","R2","R9"].includes(h.id)).id})${fl.length > 1 ? ` et ${fl.length - 1} autre(s) personne(s) signalée(s)` : ""}`, ref:l.p.id, auto:false});
     r.score = Math.min(100, r.score + r10.poids); r.alerte = r.score >= THRESHOLD || r.hits.some(h => h.auto); }); }
 let THRESHOLD = 50;
+let WIDX = null, WIDX_N = -1, SIDX = null, SIDX_N = -1;
+const ini = s => normC(s).replace(/ /g, "").charAt(0);
+function watchCands(p){
+  if (WIDX_N !== WATCH.length){ WIDX = {}; WATCH.forEach(w => [ini(w.nom), ini(w.prenoms), w.ddn].forEach(k => { (WIDX[k] = WIDX[k] || new Set()).add(w); })); WIDX_N = WATCH.length; }
+  const out = new Set(); [ini(p.nom), p.ddn].forEach(k => (WIDX[k] || []).forEach(w => out.add(w))); return out; }
+function sltdFind(doc){ if (SIDX_N !== SLTD.length){ SIDX = new Map(SLTD.map(d => [d.num + "|" + d.emet, d])); SIDX_N = SLTD.length; } return SIDX.get(doc.num + "|" + doc.emet); }
 function screen(p){
   const f = FLIGHTS.find(x => x.id === p.vol), hits = [];
   const on = id => RULES.find(r => r.id === id).actif;
@@ -509,13 +540,13 @@ function screen(p){
   if (on("R1") && !connOk("sltd")) incomplet.push("documents volés ou perdus");
   if ((on("R2") || on("R3")) && !connOk("liste")) incomplet.push("liste nationale");
   if (on("R9") && !connOk("notices")) incomplet.push("notices INTERPOL");
-  if (on("R1") && connOk("sltd")) { const s = SLTD.find(d => d.num === p.doc.num && d.emet === p.doc.emet); if (s) add("R1", `${s.type} ${s.num} (${s.emet}) signalé « ${s.motif} » le ${s.date.split("-").reverse().join("/")}`); }
-  if (connOk("liste")) WATCH.forEach(w => {
+  if (on("R1") && connOk("sltd")) { const s = sltdFind(p.doc); if (s) add("R1", `${s.type} ${s.num} (${s.emet}) signalé « ${s.motif} » le ${s.date.split("-").reverse().join("/")}`); }
+  if (connOk("liste")) watchCands(p).forEach(w => {
     const sim = nameSim(p.nom, p.prenoms, w.nom, w.prenoms);
     if (on("R2") && sim >= .97 && p.ddn === w.ddn) add("R2", `${w.nom} ${w.prenoms}, né(e) le ${w.ddn.split("-").reverse().join("/")} · consigne : ${w.niveau}`, w.id);
     else if (on("R3") && sim >= .88) add("R3", `Proximité ${Math.round(sim*100)} % avec ${w.nom} ${w.prenoms}${p.ddn === w.ddn ? ", même date de naissance" : ", date de naissance différente"}`, w.id);
   });
-  if (on("R9") && connOk("notices")) NOTICES.forEach(n => { if (nameSim(p.nom, p.prenoms, n.nom, n.prenoms) >= .95 && p.ddn === n.ddn) add("R9", `Notice ${n.type.toLowerCase()} ${n.ref} : ${n.objet}`, n.id); });
+  if (on("R9") && connOk("notices")) NOTICES.forEach(n => { if (p.ddn === n.ddn && nameSim(p.nom, p.prenoms, n.nom, n.prenoms) >= .95) add("R9", `Notice ${n.type.toLowerCase()} ${n.ref} : ${n.objet}`, n.id); });
   if (on("R4") && p.doc.exp && new Date(p.doc.exp).getTime() < f.std) add("R4", `Expiré le ${p.doc.exp.split("-").reverse().join("/")}`);
   if (on("R5") && p.pnr.api) add("R5", `DDP : ${p.pnr.api.nom} ${p.pnr.api.prenoms}, ${p.pnr.api.ddn.split("-").reverse().join("/")} · RPCV : ${p.nom} ${p.prenoms}, ${p.ddn.split("-").reverse().join("/")}`);
   if (on("R6") && p.pnr.allerSimple && p.pnr.paiement === "Espèces" && f.std - p.pnr.creation < 48*H) add("R6", `Réservé ${Math.round((f.std - p.pnr.creation)/H)} h avant le départ`);
@@ -1258,7 +1289,7 @@ function openCarrier(code){
 const UI = {q:"", apt:"", sens:"", ast:"ouvertes", edi:"", fmt:"PAXLST", svc:"Police aux Frontières (DGPN)"};
 /* Persistance locale (navigateur du visiteur seulement) */
 const STORE = "uip-demo-v4";
-function save(){ try { localStorage.setItem(STORE, JSON.stringify({ROLE, THRESHOLD, ALERT, PROC, DOSS, rules: RULES.map(r => [r.id, r.actif, r.poids]), watch: WATCH.slice(6), audit: AUDIT.slice(0, 300), SCEN, COOP: {in: COOP.in, out: COOP.out.filter(o => PAX[o.pax])}, live: LIVE.on})); } catch (e) {} }
+function save(){ try { localStorage.setItem(STORE, JSON.stringify({ROLE, THRESHOLD, ALERT, PROC, DOSS, rules: RULES.map(r => [r.id, r.actif, r.poids]), watch: WATCH.filter(w => !w.vol).slice(6), audit: AUDIT.slice(0, 300), SCEN, COOP: {in: COOP.in, out: COOP.out.filter(o => PAX[o.pax])}, live: LIVE.on})); } catch (e) {} }
 function load(){ let d; try { d = JSON.parse(localStorage.getItem(STORE) || "null"); } catch (e) { d = null; } if (!d) return;
   try { if (ROLE_LABEL[d.ROLE]) ROLE = d.ROLE; if (d.THRESHOLD) THRESHOLD = d.THRESHOLD;
     (d.rules || []).forEach(([id, a, w]) => { const r = RULES.find(x => x.id === id); if (r) { r.actif = a; r.poids = w; } });
