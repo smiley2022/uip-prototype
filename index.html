@@ -265,6 +265,7 @@ pre.fiche{font-family:var(--f-mono);font-size:.78rem;background:var(--surface);b
       <a href="#transporteurs">Transporteurs</a>
       <a href="#portail">Portail transporteurs</a>
       <a href="#protection">Protection des données</a>
+      <a href="#garde">Garde-fous <span class="cnt" id="cnt-garde"></span></a>
       <a href="#apropos">Architecture</a>
     </nav>
     <div class="who"><span class="clock" id="clock">--:--</span><span>Heure de Ouagadougou (GMT)</span><span style="margin-top:6px">Profil : <b id="whorole">Analyste</b></span><span>Cellule opérationnelle 24/7</span></div>
@@ -594,7 +595,7 @@ const stLabel = x => x.st === "recu" ? `reçu à ${hm(x.at)}` : x.st === "retard
 const alertTag = s => ({nouvelle:'<span class="tag t-red">Nouvelle</span>', en_examen:'<span class="tag t-amber">En examen</span>', a_valider:'<span class="tag t-amber">À valider</span>', transmise:'<span class="tag t-blue">Transmise</span>', ecartee:'<span class="tag t-grey">Écartée</span>'})[s.statut];
 const fLabel = f => `${f.num} · ${f.origine} → ${f.dest}`;
 const carName = code => (CARRIERS.find(c => c.code === code) || {nom: code}).nom;
-const cntAlert = () => { $("#cnt-alertes").textContent = openAlerts().length || ""; $("#cnt-coop").textContent = coopOpen() || ""; $("#cnt-conn").textContent = CONNECTORS.filter(c => c.etat !== "ok").length ? "!" : ""; };
+const cntAlert = () => { $("#cnt-alertes").textContent = openAlerts().length || ""; $("#cnt-coop").textContent = coopOpen() || ""; $("#cnt-conn").textContent = CONNECTORS.filter(c => c.etat !== "ok").length ? "!" : ""; const g = $("#cnt-garde"); if (g) g.textContent = REID.filter(r => r.statut === "En attente du DPD").length || ""; };
 const connBanner = () => { const down = CONNECTORS.filter(c => c.etat !== "ok"); return down.length ? `<div class="msg m-red">Base indisponible : ${down.map(c => esc(c.nom)).join(", ")}. Les passagers criblés pendant l'incident sont marqués « criblage incomplet » et seront recriblés au rétablissement. <a href="#interconnexions">Voir les interconnexions</a></div>` : ""; };
 
 /* =============== Vues =============== */
@@ -675,7 +676,7 @@ ciblage(){
   <div class="card"><header><h2>Scénarios composés</h2><button class="btn sm pri" type="button" id="newscen" ${ROLE === "DPD" ? "disabled" : ""}>Nouveau scénario</button></header>
     <p class="note" style="margin:0 0 10px">Un scénario combine au moins deux critères objectifs de voyage. La nationalité, le sexe et les données sensibles ne sont pas proposés (art. 11 et 13). Un scénario n'est actif qu'après validation par un autre profil habilité, et il est revu tous les 6 mois.</p>
     <div class="tw" style="border:0"><table class="t min"><thead><tr><th>Actif</th><th>Scénario</th><th>Poids</th><th>Statut</th><th>Déclenchements</th><th>Revue</th><th></th></tr></thead><tbody>
-    ${SCEN.map(x => { const c = Object.values(RES).filter(r => r.hits.some(h => h.id === x.id)).length; return `<tr><td><label class="switch"><input type="checkbox" data-scen="${x.id}" ${x.actif ? "checked" : ""} ${canSup() && x.statut === "Validé" ? "" : "disabled"} aria-label="Activer ${esc(x.nom)}"></label></td><td><b>${x.id}</b> · ${esc(x.nom)}<div class="note">${esc(x.conds.map(condTxt).join(" · "))}</div><div class="note">Proposé par ${esc(x.par)}${x.valPar ? `, validé par ${esc(ROLE_LABEL[x.valPar] || x.valPar)}` : ""}</div></td><td class="n">${x.poids}</td><td>${x.statut === "Validé" ? '<span class="tag t-green">Validé</span>' : '<span class="tag t-amber">À valider</span>'}</td><td class="n">${c}</td><td class="n">${dShort(x.revue)}</td><td>${x.statut !== "Validé" && canSup() && ROLE !== x.parRole ? `<button class="btn sm pri" type="button" data-scval="${x.id}">Valider</button> ` : ""}${canSup() ? `<button class="btn sm ghost" type="button" data-scdel="${x.id}">Retirer</button>` : ""}</td></tr>`; }).join("") || '<tr><td colspan="7" class="muted">Aucun scénario.</td></tr>'}
+    ${SCEN.map(x => { const c = Object.values(RES).filter(r => r.hits.some(h => h.id === x.id)).length; return `<tr><td><label class="switch"><input type="checkbox" data-scen="${x.id}" ${x.actif ? "checked" : ""} ${canSup() && x.statut === "Validé" ? "" : "disabled"} aria-label="Activer ${esc(x.nom)}"></label></td><td><b>${x.id}</b> · ${esc(x.nom)}<div class="note">${esc(x.conds.map(condTxt).join(" · "))}</div><div class="note">Proposé par ${esc(x.par)}${x.valPar ? `, validé par ${esc(ROLE_LABEL[x.valPar] || x.valPar)}` : ""}</div></td><td class="n">${x.poids}</td><td>${x.statut === "Validé" ? '<span class="tag t-green">Validé</span>' : '<span class="tag t-amber">À valider</span>'}</td><td class="n">${c}</td><td class="n">${dShort(x.revue)}</td><td>${x.statut !== "Validé" && ROLE === "DPD" && ROLE !== x.parRole ? `<button class="btn sm pri" type="button" data-scval="${x.id}">Valider (DPD)</button> ` : x.statut !== "Validé" ? '<span class="note">En attente du DPD</span> ' : ""}${canSup() ? `<button class="btn sm ghost" type="button" data-scdel="${x.id}">Retirer</button>` : ""}</td></tr>`; }).join("") || '<tr><td colspan="7" class="muted">Aucun scénario.</td></tr>'}
     </tbody></table></div></div>
   <p class="note">${canSup() ? "Les changements s'appliquent immédiatement à tous les vols et sont inscrits au journal d'audit." : "Lecture seule : seuls les profils Superviseur et Administrateur modifient les règles. Changez de profil dans le bandeau pour essayer."}</p>`;
 },
@@ -716,7 +717,11 @@ transporteurs(){
     const cx = CONN_MODE[s.c.code] || {m: "Portail web UIP", st: "En test"};
     return `<tr><td><b>${esc(s.c.nom)}</b> <span class="note mono">${s.c.code}</span></td><td>${esc(cx.m)}<div class="note">${cx.st === "Certifié" ? "Certifié" : '<span style="color:var(--amber)">' + esc(cx.st) + "</span>"}</div></td><td class="n">${s.vols}</td><td class="n">${s.due}</td><td class="n">${s.ok}</td><td class="n">${s.late}</td><td class="n">${s.miss}</td><td><div class="row" style="flex-wrap:nowrap"><div class="rate"><i style="width:${s.taux}%;background:${col}"></i></div><span class="mono">${s.taux} %</span></div></td><td>${pr.etape ? `<span class="tag t-amber">${esc(PROC_STEPS[pr.etape])}</span>` : '<span class="muted">—</span>'}</td><td><button class="btn sm" type="button" data-carrier="${s.c.code}">Dossier</button></td></tr>`; }).join("")}
   </tbody></table></div>
-  <p class="note">Délai de mise en conformité : 6 mois après l'entrée en vigueur du décret (art. 24). Aucune sanction pour un incident imputable au système national (art. 22).</p>`;
+  <p class="note">Délai de mise en conformité : 6 mois après l'entrée en vigueur du décret (art. 24). Aucune sanction pour un incident imputable au système national (art. 22).</p>
+  <div class="card"><header><h2>Homologation avant la production</h2><span class="note">9 étapes : 5 contrôles automatiques sur les messages de test, 4 signatures de l'administrateur</span></header>
+    <div class="tw" style="border:0"><table class="t min"><thead><tr>${["Transporteur", ...HOMOL.map(h => h[1])].map(h => `<th>${esc(h)}</th>`).join("")}<th>État</th></tr></thead><tbody>
+    ${CARRIERS.map(c => { const d = homolDone(c); const n = d.filter(Boolean).length; return `<tr><td><b>${esc(c.nom)}</b> <span class="note mono">${c.code}</span></td>${d.map((ok, i) => `<td>${ok ? '<span class="tag t-green">✓</span>' : ROLE === "Administrateur" && !HOMOL[i][2] ? `<button class="btn sm" type="button" data-homol="${c.code}:${i}">Signer</button>` : '<span class="tag t-grey">À faire</span>'}</td>`).join("")}<td>${n === HOMOL.length ? '<span class="tag t-green">Production</span>' : `<span class="tag t-amber">Recette ${n}/${HOMOL.length}</span>`}</td></tr>`; }).join("")}</tbody></table></div>
+    <p class="note" style="margin:8px 12px 12px">Le passage en production est bloqué tant qu'une étape manque. Formats acceptés : PAXLST D:02B à D:22B, PNRGOV EDIFACT 11.1 à 18.1, PNRGOV XML ; plusieurs messages par envoi, accusé CONTRL message par message.</p></div>`;
 },
 
 protection(){
@@ -852,10 +857,35 @@ cooperation(){
   const row = (o, dir) => `<tr class="clk" data-coop="${dir}:${o.id}"><td class="n">${esc(o.id)}</td><td>${esc(dir === "in" ? o.de : o.vers)}</td><td>${esc(o.objet)}</td><td class="n">${dShort(o.at)} ${hm(o.at)}</td><td><span class="tag ${/attente|instruire/i.test(o.statut) ? "t-amber" : /Refus/.test(o.statut) ? "t-grey" : "t-blue"}">${esc(o.statut)}</span></td></tr>`;
   return `
   <div class="head"><div><span class="lbl">Échanges entre unités d'information passagers</span><h1>Coopération internationale</h1><p>Demandes adressées par les UIP partenaires et demandes envoyées par l'UIP du Burkina. Une réponse n'est accordée qu'au cas par cas : finalité conforme au décret, demande individualisée et garanties de protection des données. Les partenaires sont simulés.</p></div></div>
+  <div class="card"><header><h2>Bases juridiques en vigueur</h2><span class="note">aucun échange sans l'une d'elles</span></header>
+    <div class="tw" style="border:0"><table class="t min"><thead><tr><th>Partenaire</th><th>Base</th><th>Données transmissibles</th><th>Validité</th></tr></thead><tbody>
+    ${[["UIP Côte d'Ivoire (fictif)","Accord bilatéral fictif du 12/03/2026","Identité, document, vol","En vigueur"],["BCN INTERPOL partenaire (fictif)","Réseau I-24/7 et règles de l'organisation","Identité, document, vol, réservation","En vigueur"],["UIP Mali (fictif)","Protocole régional fictif de 2025","Identité, vol","Expirée : échanges bloqués"]]
+      .map(([a, b, c, d]) => `<tr><td><b>${a}</b></td><td>${b}</td><td>${c}</td><td><span class="tag ${/Expir/.test(d) ? "t-grey" : "t-green"}">${d}</span></td></tr>`).join("")}</tbody></table></div>
+    <p class="note" style="margin:8px 12px 12px">Seules les catégories prévues par l'accord peuvent être transmises. Chaque réponse est préparée par un analyste puis validée par le délégué à la protection des données avant envoi.</p></div>
   <div class="card"><header><h2>Demandes reçues</h2><span class="note">${COOP.in.filter(o => o.statut === "À instruire").length} à instruire</span></header>
     <div class="tw" style="border:0"><table class="t min"><thead><tr><th>Référence</th><th>Demandeur</th><th>Objet</th><th>Reçue le</th><th>Statut</th></tr></thead><tbody>${COOP.in.map(o => row(o, "in")).join("")}</tbody></table></div></div>
   <div class="card"><header><h2>Demandes envoyées</h2></header>
     ${COOP.out.length ? `<div class="tw" style="border:0"><table class="t min"><thead><tr><th>Référence</th><th>Destinataire</th><th>Objet</th><th>Envoyée le</th><th>Statut</th></tr></thead><tbody>${COOP.out.map(o => row(o, "out")).join("")}</tbody></table></div>` : '<p class="muted" style="margin:0">Aucune demande envoyée. Depuis une fiche passager, utilisez « Interroger une UIP partenaire ».</p>'}</div>`;
+},
+
+garde(){
+  const pend = REID.filter(r => r.statut === "En attente du DPD").length;
+  return `
+  <div class="head"><div><span class="lbl">Droits fondamentaux</span><h1>Garde-fous inscrits dans le logiciel</h1><p>Ces règles ne dépendent pas d'une consigne : le logiciel refuse ce qu'elles interdisent, quel que soit le profil connecté. Chaque refus et chaque décision sont inscrits au journal.</p></div></div>
+  <div class="tw"><table class="t min"><thead><tr><th>Garde-fou</th><th>Ce que fait le logiciel</th></tr></thead><tbody>
+    ${[["Données sensibles", "Les codes de repas religieux et de santé (MOML, KSML, WCHR, MEDA…) sont supprimés à la réception, avant tout stockage."],
+       ["Critères interdits", "Aucun scénario ne peut porter sur la nationalité, le pays émetteur du document, le sexe, l'âge, le nom, l'origine, la religion, la santé, les opinions ou la vie sexuelle."],
+       ["Scénarios", "Au moins deux critères objectifs du voyage, au plus 5 % des voyageurs visés, validation par le délégué à la protection des données (jamais par l'auteur), revue tous les 90 jours."],
+       ["Décision humaine", "Aucune alerte n'est transmise sans l'examen d'un analyste et la validation d'un superviseur distinct."],
+       ["Recherche", "Motif et référence de procédure obligatoires, inscrits au journal."],
+       ["Données masquées", "Après 6 mois, l'identité est masquée et scellée (chiffrée). Elle ne se rouvre que sur demande motivée, accord du délégué à la protection des données, pour le seul demandeur et 48 heures."],
+       ["Coopération internationale", "Aucun échange sans base juridique en vigueur ; seules les catégories de données prévues par l'accord ; validation du délégué avant envoi."],
+       ["Accès", "Double authentification (code à usage unique) pour chaque agent ; compte verrouillé après 5 échecs ; l'administrateur ne voit pas les passagers."]]
+      .map(([a, b]) => `<tr><td><b>${a}</b></td><td>${b}</td></tr>`).join("")}</tbody></table></div>
+  <div class="card"><header><h2>Demandes de réidentification</h2><span class="note">${pend} en attente du délégué</span></header>
+    <div class="tw" style="border:0"><table class="t min"><thead><tr><th>Demande</th><th>Voyageur masqué</th><th>Procédure</th><th>État</th><th></th></tr></thead><tbody>
+    ${REID.map(r => `<tr><td class="n">${dShort(r.at)}<div class="note">${esc(r.par)}</div></td><td>Identité scellée · vol ${esc(r.vol)}</td><td><b>${esc(r.ref)}</b> · ${esc(r.autorite)}<div class="note">${esc(r.motif)}</div></td><td><span class="tag ${r.statut === "Accordée" ? "t-green" : r.statut === "Refusée" ? "t-red" : "t-amber"}">${esc(r.statut)}</span></td>
+      <td>${r.statut === "En attente du DPD" && ROLE === "DPD" ? `<button class="btn sm pri" type="button" data-reid="${r.id}:ok">Accorder 48 h</button> <button class="btn sm ghost" type="button" data-reid="${r.id}:non">Refuser</button>` : r.statut === "En attente du DPD" ? '<span class="note">Décision réservée au profil DPD</span>' : ""}</td></tr>`).join("")}</tbody></table></div></div>`;
 },
 
 dossiers(){
@@ -1434,6 +1464,14 @@ setInterval(() => { if (LIVE.on && !document.hidden) liveTick(); }, 30000);
 
 /* ---------- Coopération internationale (simulation) ---------- */
 const PARTNERS = ["UIP Côte d'Ivoire","UIP Mali","UIP Niger","UIP Sénégal","UIP Ghana","UIP Togo","UIP France"];
+/* Homologation des transporteurs : [clé, libellé court, contrôle automatique ?] */
+const HOMOL = [["api","PAXLST valide",true],["pnr","PNRGOV valide",true],["vol","Vol de 50 pax ou plus",true],["qual","5 envois sans rejet",true],["vers","Versions reconnues",true],
+  ["conv","Protocole signé",false],["contact","Contact 24 h/24",false],["canal","Canal sécurisé",false],["info","Information des passagers",false]];
+const HOMOL_SIGN = {};
+const REID = [{id:"RI-1", at: NOW0 - 3*H, par:"Analyste de permanence", vol:"ZQ 212 du 02/10/2025", ref:"PV 118/2026 (fictif)", autorite:"Réquisition du procureur du Faso (fictive)", motif:"Enquête fictive sur une filière de faux documents passée par ce vol.", statut:"En attente du DPD"},
+  {id:"RI-2", at: NOW0 - 9*DAY, par:"Superviseur de quart", vol:"ZV 455 du 14/03/2026", ref:"CR 31/2026 (fictif)", autorite:"Commission rogatoire (fictive)", motif:"Recoupement des déplacements d'un suspect déjà identifié (fictif).", statut:"Accordée"}];
+function homolDone(c){ const cert = (CONN_MODE[c.code] || {}).st === "Certifié"; const h = hashN(c.code);
+  return HOMOL.map((x, i) => cert || (HOMOL_SIGN[c.code + ":" + i]) || (x[2] ? (h >> i) % 4 !== 0 : (h >> (i + 3)) % 3 === 0)); }
 const COOP = {in: [
   {id:"CI-2026-014", de:"UIP Côte d'Ivoire", at:NOW0 - 5*H, objet:"Déplacements de KAPRISSO Daniel (notice rouge A-1187/3-2025) sur 30 jours", finalite:"Criminalité grave : recherche en vue d'extradition", indiv:true, statut:"À instruire", hist:[]},
   {id:"ML-2026-031", de:"UIP Mali", at:NOW0 - 26*H, objet:"Liste de tous les passagers BKO → OUA ayant payé en espèces la semaine dernière", finalite:"Analyse générale, sans personne ni affaire désignée", indiv:false, statut:"À instruire", hist:[]},
@@ -1498,7 +1536,8 @@ function openScenForm(){
       ${[0,1,2].map(i => scRow(i, i === 0 ? {champ:"trajet", val:"Aller simple"} : i === 1 ? {champ:"delai", val:"48"} : null)).join("")}
       <p class="note" style="margin:0">Au moins deux critères. Poids limité à 60 points : un scénario seul ne déclenche pas d'alerte automatique au-delà du seuil sans un autre indice.</p>
       <div id="sc-out"></div>
-      <div class="row"><button class="btn" type="button" id="sc-test">Tester sur les vols en cours</button><button class="btn pri" type="button" id="sc-save">${canSup() ? "Enregistrer (validation par un autre profil)" : "Proposer au superviseur"}</button></div></div>`;
+      <div class="row"><button class="btn" type="button" id="sc-test">Tester sur les vols en cours</button><button class="btn pri" type="button" id="sc-save">Soumettre au délégué à la protection des données</button></div>
+      <p class="note" style="margin:8px 0 0">Critères refusés par le logiciel : nationalité, pays émetteur du document, sexe, âge, nom, origine, religion, repas, santé, handicap, opinions, vie sexuelle. Seuls des éléments objectifs du voyage sont proposés. Au plus 5 % des voyageurs visés ; revue obligatoire tous les 90 jours.</p></div>`;
   if (!dlg.open) dlg.showModal();
 }
 function scRead(){ return [0,1,2].map(i => ({champ: $("#sc-f" + i).value, val: ($("#sc-v" + i).value || "").trim()})).filter(c => c.champ && c.val !== ""); }
@@ -1507,12 +1546,15 @@ function scSave(){
   const nom = $("#sc-nom").value.trim(), poids = Math.max(5, Math.min(60, +$("#sc-poids").value || 25)), conds = scRead();
   if (nom.length < 3) { toast("Donnez un intitulé au scénario."); return; }
   if (conds.length < 2) { toast("Un scénario doit combiner au moins deux critères (art. 13)."); return; }
-  const x = {id: "S" + (Math.max(0, ...SCEN.map(y => +y.id.slice(1))) + 1), nom, poids, actif: true, statut: "À valider", parRole: ROLE, par: ROLE_LABEL[ROLE], at: Date.now(), revue: Date.now() + 182*DAY, conds};
-  SCEN.push(x); audit("Proposition d'un scénario de ciblage", `${x.id} · ${x.nom}`); $("#dlg").close(); render(); toast(`Scénario ${x.id} proposé : il sera actif après validation.`);
+  if (new Set(conds.map(c => c.champ)).size < 2) { toast("Les deux critères doivent porter sur des éléments différents du voyage."); return; }
+  const share = scTest(conds).length / Math.max(1, Object.values(PAX).filter(p => p.statut === "Passager").length);
+  if (share > .05) { toast(`Scénario refusé par le logiciel : il vise ${(share * 100).toFixed(1)} % des voyageurs (maximum 5 %).`); return; }
+  const x = {id: "S" + (Math.max(0, ...SCEN.map(y => +y.id.slice(1))) + 1), nom, poids, actif: true, statut: "À valider", parRole: ROLE, par: ROLE_LABEL[ROLE], at: Date.now(), revue: Date.now() + 90*DAY, conds};
+  SCEN.push(x); audit("Proposition d'un scénario de ciblage", `${x.id} · ${x.nom}`); $("#dlg").close(); render(); toast(`Scénario ${x.id} proposé : il sera actif après validation par le délégué à la protection des données.`);
 }
 
 /* ---------- Recherche rapide (Ctrl + K) ---------- */
-const PAGES = {veille:"Salle de veille", vols:"Vols", carte:"Carte des liaisons", alertes:"Alertes", services:"Services destinataires", ciblage:"Règles de ciblage", listes:"Listes de surveillance", dossiers:"Dossiers d'enquête", reception:"Réception API / PNR", recherche:"Recherche nominative (motif obligatoire)", interconnexions:"Interconnexions", cooperation:"Coopération internationale", statistiques:"Statistiques", transporteurs:"Transporteurs", portail:"Portail transporteurs", protection:"Protection des données", apropos:"Architecture"};
+const PAGES = {veille:"Salle de veille", vols:"Vols", carte:"Carte des liaisons", alertes:"Alertes", services:"Services destinataires", ciblage:"Règles de ciblage", listes:"Listes de surveillance", dossiers:"Dossiers d'enquête", reception:"Réception API / PNR", recherche:"Recherche nominative (motif obligatoire)", interconnexions:"Interconnexions", cooperation:"Coopération internationale", statistiques:"Statistiques", transporteurs:"Transporteurs", portail:"Portail transporteurs", protection:"Protection des données", garde:"Garde-fous", apropos:"Architecture"};
 function qkResults(q){ q = norm(q); const out = [];
   Object.entries(PAGES).forEach(([k, l]) => { if (!q || norm(l).includes(q)) out.push({l, s:"Page", a:"page:" + k}); });
   if (q) { FLIGHTS.filter(f => norm(f.num + " " + f.origine + " " + f.dest + " " + (APT[f.origine] || "") + " " + (APT[f.dest] || "") + " " + carName(f.carrier)).includes(q)).slice(0, 6).forEach(f => out.push({l: fLabel(f), s: `Vol · ${dShort(fTime(f))} ${hm(fTime(f))}`, a: "flight:" + f.id}));
@@ -1560,7 +1602,7 @@ document.addEventListener("click", e => {
   const cpd = t.closest("[data-cpdec]"); if (cpd) { coopDecide(cpd.dataset.cpdec); return; }
   const xf = t.closest("[data-expflight]"); if (xf) { const f = FLIGHTS.find(x => x.id === xf.dataset.expflight); audit("Export du manifeste", fLabel(f));
     dlCsv(`manifeste-${f.num.replace(" ", "")}-${iso(f.std)}.csv`, [["Nom","Prénoms","Statut","Sexe","Naissance","Nationalité","Document","Émetteur","Expiration","Siège","PNR","Score","Règles"]].concat(f.pax.map(p => [p.nom, p.prenoms, p.statut, p.sexe, p.ddn, p.nat, p.doc.num, p.doc.emet, p.doc.exp, p.siege, p.pnr.loc, RES[p.id].score, RES[p.id].hits.map(h => h.id).join(" ")]))); return; }
-  const sv = t.closest("[data-scval]"); if (sv) { const x = SCEN.find(y => y.id === sv.dataset.scval); if (!canSup() || ROLE === x.parRole) { toast("La validation revient à un autre profil habilité."); return; } x.statut = "Validé"; x.valPar = ROLE; screenAll(); audit("Validation d'un scénario de ciblage", `${x.id} · ${x.nom}`); render(); toast(`Scénario ${x.id} validé et actif.`); return; }
+  const sv = t.closest("[data-scval]"); if (sv) { const x = SCEN.find(y => y.id === sv.dataset.scval); if (ROLE !== "DPD" || ROLE === x.parRole) { toast("La validation d'un scénario revient au délégué à la protection des données (profil DPD), jamais à son auteur."); return; } x.statut = "Validé"; x.valPar = ROLE; x.revue = Date.now() + 90*DAY; screenAll(); audit("Validation d'un scénario de ciblage", `${x.id} · ${x.nom}`); render(); toast(`Scénario ${x.id} validé et actif.`); return; }
   const sd = t.closest("[data-scdel]"); if (sd) { const i = SCEN.findIndex(y => y.id === sd.dataset.scdel); const x = SCEN.splice(i, 1)[0]; screenAll(); audit("Retrait d'un scénario de ciblage", `${x.id} · ${x.nom}`); render(); return; }
   const dop = t.closest("[data-dopen]"); if (dop) { e.preventDefault(); openDossier(dop.dataset.dopen); return; }
   const px = t.closest("[data-pax]"); if (px && !t.closest("dialog")) { openPax(px.dataset.pax); return; }
@@ -1596,6 +1638,8 @@ document.addEventListener("click", e => {
   if (t.id === "newscen") { openScenForm(); return; }
   if (t.id === "sc-test") { const c = scRead(); const n = c.length < 2 ? null : scTest(c).length; $("#sc-out").innerHTML = n === null ? '<div class="msg m-amber">Choisissez au moins deux critères.</div>' : `<div class="msg ${n / Object.keys(PAX).length > .05 ? "m-amber" : "m-green"}">${n} passager(s) concerné(s) sur ${Object.keys(PAX).length} (${(n / Object.keys(PAX).length * 100).toFixed(1)} %).${n / Object.keys(PAX).length > .05 ? " Scénario trop large : il produirait beaucoup de faux positifs." : ""}</div>`; return; }
   if (t.id === "sc-save") { scSave(); return; }
+  const hm1 = t.closest("[data-homol]"); if (hm1) { const r = prompt("Référence (document signé, nom du contact, date du test…)"); if (!r || r.trim().length < 3) return; HOMOL_SIGN[hm1.dataset.homol] = r.trim(); const [code, i] = hm1.dataset.homol.split(":"); audit("Homologation transporteur", `${code} · ${HOMOL[+i][1]} · réf. ${r.trim()}`); render(); toast("Étape signée."); return; }
+  const rd = t.closest("[data-reid]"); if (rd) { const [id, d] = rd.dataset.reid.split(":"); const r = REID.find(x => x.id === id); const m = prompt(d === "ok" ? "Motif de l'accord (réquisition vérifiée…)" : "Motif du refus"); if (!m || m.trim().length < 5) { toast("Motif obligatoire (5 caractères au moins)."); return; } r.statut = d === "ok" ? "Accordée" : "Refusée"; audit(d === "ok" ? "Réidentification accordée (48 h)" : "Réidentification refusée", `${r.ref} · demandeur ${r.par}`); render(); toast(d === "ok" ? "Accès accordé au seul demandeur, pour 48 heures." : "Demande refusée."); return; }
   if (t.id === "resetdemo") { if (confirm("Effacer les décisions, dossiers et réglages enregistrés dans ce navigateur ?")) { try { localStorage.removeItem(STORE); } catch (err) {} location.hash = ""; location.reload(); } return; }
   if (t.id === "newdoss") { const d = {id: `DOS-2026-${pad(DOSS.length + 1).padStart(3, "0")}`, titre: "Nouveau dossier", statut: "Ouvert", ref: "À compléter", pax: [], notes: [], at: Date.now()}; DOSS.unshift(d); audit("Ouverture d'un dossier d'enquête", d.id); render(); openDossier(d.id); return; }
   if (t.id === "d-add" || t.id === "d-addlinks") { const pid = $("#dlg").dataset.pax, p = PAX[pid]; let v = $("#d-sel").value, d;
